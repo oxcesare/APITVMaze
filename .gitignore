@@ -1,0 +1,63 @@
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+pom.xml.bak
+release.properties
+dependency-reduced-pom.xml
+.flattened-pom.xml
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### IntelliJ IDEA ###
+.idea/
+out/
+*.iws
+*.iml
+*.ipr
+*.iml.bak
+*.bak
+
+### Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+
+### Windows ###
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+### Environment & Configuration ###
+.env
+.env.local
+.env.*.local
+*.properties.local
+
+### Logs ###
+*.log
+*.log.*
+logs/
+
+### Runtime & Cache ###
+.m2/
+.gradle/
+*.swp
+*.swo
+*~
+.cache/
+.idea_modules/
+
+# Other files for JavaDOC
+javadoc/
+/docs/
+/target/site/apidocs/
+/target
