@@ -5,6 +5,7 @@ import com.mx.tvmazemiddleware.client.TVClient;
 import com.mx.tvmazemiddleware.dto.*;
 
 import java.util.List;
+
 import org.springframework.stereotype.Service;
 
 @Service
@@ -16,8 +17,12 @@ public class TVMazeService {
         this.tvClient = tvClient;
     }
 
-    public List<ShowResponse> searchShows(String searchQuery){
+    public List<ShowResponse> searchShows(String searchQuery) {
         return tvClient.searchShows(searchQuery);
+    }
+
+    public ShowDetailResponse getShowById(Long showId) {
+        return tvClient.getShowById(showId);
     }
 
 }

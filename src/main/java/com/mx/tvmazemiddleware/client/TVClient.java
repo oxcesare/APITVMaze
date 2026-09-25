@@ -1,5 +1,6 @@
 package com.mx.tvmazemiddleware.client;
 
+import com.mx.tvmazemiddleware.dto.ShowDetailResponse;
 import com.mx.tvmazemiddleware.dto.ShowResponse;
 import com.mx.tvmazemiddleware.exception.TvMazeUnavailableException;
 import com.mx.tvmazemiddleware.exception.TvNotShowException;
@@ -18,7 +19,27 @@ public class TVClient {
         this.restClient = restClient;
     }
 
-    public List<ShowResponse> searchShows(String searchQuery)  {
+    public ShowDetailResponse getShowById(Long showId) {
+
+        ShowDetailResponse showDetailResponse;
+
+        try {
+            showDetailResponse = restClient.get()
+                    .uri("/shows/{id}", showId)
+                    .retrieve()
+                    .body(ShowDetailResponse.class);
+        } catch (RestClientException ex) {
+            throw new TvMazeUnavailableException("No se pudo conectar con TVMaze", ex);
+        }
+
+        if (showDetailResponse == null) {
+            throw new TvNotShowException(String.valueOf(showId));
+        }
+
+        return showDetailResponse;
+    }
+
+    public List<ShowResponse> searchShows(String searchQuery) {
 
         SearchResultItem[] results;
 
