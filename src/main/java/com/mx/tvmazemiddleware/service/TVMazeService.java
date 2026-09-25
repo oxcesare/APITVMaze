@@ -40,20 +40,47 @@ public class TVMazeService {
                 .map(rating -> new RatingInfo(rating.comment(), rating.rating()))
                 .toList();
 
-
         show.setComments(comments);
-
-
-
 
     }
 
     public ShowDetailResponse getShowById(Long showId) {
-        return showRepository.findById(showId)
+        ShowDetailResponse show = showRepository.findById(showId)
                 .orElseGet(() -> {
-                    ShowDetailResponse show = tvClient.getShowById(showId);
-                    return showRepository.save(show);
+                    ShowDetailResponse response = tvClient.getShowById(showId);
+                    return showRepository.save(response);
                 });
+
+        List<RatingInfo> comments = ratingRepository.findByShowId(showId).stream()
+                .map(rating -> new RatingInfo(rating.comment(), rating.rating()))
+                .toList();
+
+        return new ShowDetailResponse(
+                show.id(),
+                show.url(),
+                show.name(),
+                show.type(),
+                show.language(),
+                show.genres(),
+                show.status(),
+                show.runtime(),
+                show.averageRuntime(),
+                show.premiered(),
+                show.ended(),
+                show.officialSite(),
+                show.schedule(),
+                show.rating(),
+                show.weight(),
+                show.network(),
+                show.webChannel(),
+                show.dvdCountry(),
+                show.externals(),
+                show.image(),
+                show.summary(),
+                show.updated(),
+                show.links(),
+                comments
+        );
     }
 }
 

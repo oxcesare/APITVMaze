@@ -31,6 +31,7 @@ public record ShowDetailResponse(
         Image image,
         String summary,
         Long updated,
-        @JsonProperty("_links") Links links
+        @JsonProperty("_links") Links links,
+        List<RatingInfo> comments
 ) {
 }
