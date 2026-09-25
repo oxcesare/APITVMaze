@@ -14,6 +14,7 @@ public class ShowResponse {
     private String channel;
     private String summary;
     private List<String> genres;
+    private List<RatingInfo> comments;
 
     @JsonProperty("network")
     private void setNetwork(Map<String, Object> network) {
@@ -67,5 +68,13 @@ public class ShowResponse {
 
     public void setGenres(List<String> genres) {
         this.genres = genres;
+    }
+
+    public List<RatingInfo> getComments() {
+        return comments;
+    }
+
+    public void setComments(List<RatingInfo> comments) {
+        this.comments = comments;
     }
 }

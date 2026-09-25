@@ -2,10 +2,14 @@ package com.mx.tvmazemiddleware.service;
 
 
 import com.mx.tvmazemiddleware.client.TVClient;
-import com.mx.tvmazemiddleware.dto.*;
+import com.mx.tvmazemiddleware.dto.rating.Rating;
 
 import java.util.List;
 
+import com.mx.tvmazemiddleware.dto.RatingInfo;
+import com.mx.tvmazemiddleware.dto.ShowDetailResponse;
+import com.mx.tvmazemiddleware.dto.ShowResponse;
+import com.mx.tvmazemiddleware.repository.RatingRepository;
 import com.mx.tvmazemiddleware.repository.ShowRepository;
 import org.springframework.stereotype.Service;
 
@@ -14,14 +18,34 @@ public class TVMazeService {
 
     private final TVClient tvClient;
     private final ShowRepository showRepository;
+    private final RatingRepository ratingRepository;
 
-    public TVMazeService(TVClient tvClient, ShowRepository showRepository) {
+
+    public TVMazeService(TVClient tvClient, ShowRepository showRepository, RatingRepository ratingRepository) {
         this.tvClient = tvClient;
         this.showRepository = showRepository;
+        this.ratingRepository = ratingRepository;
     }
 
     public List<ShowResponse> searchShows(String searchQuery) {
-        return tvClient.searchShows(searchQuery);
+        List<ShowResponse> shows = tvClient.searchShows(searchQuery);
+        shows.forEach(this::addCommentsToShow);
+        return shows;
+    }
+
+    private void addCommentsToShow(ShowResponse show) {
+        List<Rating> ratings = ratingRepository.findByShowId(show.getId());
+
+        List<RatingInfo> comments = ratings.stream()
+                .map(rating -> new RatingInfo(rating.comment(), rating.rating()))
+                .toList();
+
+
+        show.setComments(comments);
+
+
+
+
     }
 
     public ShowDetailResponse getShowById(Long showId) {
