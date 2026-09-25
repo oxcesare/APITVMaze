@@ -7,7 +7,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class Main {
     public static void main(String[] args) {
-        System.out.println("MONGODB_URI = [" + System.getProperty("MONGODB_URI") + "]");
         SpringApplication.run(Main.class, args);
     }
 }
