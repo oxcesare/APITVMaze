@@ -63,6 +63,6 @@ public class TVClient {
     }
 
 
-    private record SearchResultItem(ShowResponse show) {
+    record SearchResultItem(ShowResponse show) {
     }
 }
