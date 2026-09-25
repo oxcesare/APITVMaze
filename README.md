@@ -47,3 +47,13 @@ http://localhost:8080/shows/1
 
 http://localhost:8080/search/shows?searchQuery=bads100
 
+
+POST http://localhost:8080/ratings
+Content-Type: application/json
+
+{
+"showId": 1,
+"comment": "Excelente serie",
+"rating": 5
+}
+
