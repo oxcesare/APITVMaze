@@ -1,4 +1,47 @@
 package com.mx.tvmazemiddleware.client;
 
+import com.mx.tvmazemiddleware.dto.ShowResponse;
+import com.mx.tvmazemiddleware.exception.TvMazeUnavailableException;
+import com.mx.tvmazemiddleware.exception.TvNotShowException;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+
+import java.util.List;
+
+@Component
 public class TVClient {
+
+    private final RestClient restClient;
+
+    public TVClient(RestClient restClient) {
+        this.restClient = restClient;
+    }
+
+    public List<ShowResponse> searchShows(String searchQuery)  {
+
+        SearchResultItem[] results;
+
+        try {
+            results = restClient.get()
+                    .uri("/search/shows?q={q}", searchQuery)
+                    .retrieve()
+                    .body(SearchResultItem[].class);
+        } catch (RestClientException ex) {
+            throw new TvMazeUnavailableException("No se pudo conectar con TVMaze", ex);
+        }
+
+
+        if (results == null || results.length == 0) {
+            throw new TvNotShowException(searchQuery);
+        }
+
+        return List.of(results).stream()
+                .map(SearchResultItem::show)
+                .toList();
+    }
+
+
+    private record SearchResultItem(ShowResponse show) {
+    }
 }
