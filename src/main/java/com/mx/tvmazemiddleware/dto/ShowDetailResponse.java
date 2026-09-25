@@ -4,7 +4,9 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
+import org.springframework.data.mongodb.core.mapping.Document;
 
+@Document(collection = "shows")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ShowDetailResponse(
         Long id,

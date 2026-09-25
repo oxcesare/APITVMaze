@@ -32,7 +32,14 @@ service/
 mvn clean install
 
 ### Ejecución
-mvn spring-boot:run 
+
+1. Clona el repositorio
+2. Configura la variable de entorno `MONGODB_URI` con tu connection string de MongoDB Atlas:
+
+desde la Terminal:
+
+export MONGODB_URI="mongodb+srv://usuario:password@cluster.mongodb.net/tvmaze?retryWrites=true&w=majority"
+mvn spring-boot:run
 
 ### Endpoints 
 
