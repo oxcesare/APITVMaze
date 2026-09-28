@@ -1,0 +1,31 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+	ignorecase = true
+	precomposeunicode = true
+[remote "origin"]
+	url = https://github.com/oxcesare/APITVMaze.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[branch "main"]
+	remote = origin
+	merge = refs/heads/main
+[branch "feature/architecture"]
+	remote = origin
+	merge = refs/heads/feature/architecture
+[branch "feature/A-Endpointsearch"]
+	remote = origin
+	merge = refs/heads/feature/A-Endpointsearch
+[branch "feature/B-Endpointshow"]
+	remote = origin
+	merge = refs/heads/feature/B-Endpointshow
+[branch "feature/B-EndpointshowBD"]
+	remote = origin
+	merge = refs/heads/feature/B-EndpointshowBD
+[branch "feature/C-EndPointComments"]
+	remote = origin
+	merge = refs/heads/feature/C-EndPointComments
+[branch "feature/B-EndPointShowComments"]
+	remote = origin
+	merge = refs/heads/feature/B-EndPointShowComments
