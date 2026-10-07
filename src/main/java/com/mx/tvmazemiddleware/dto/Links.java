@@ -5,5 +5,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record Links(
         Link self,
+        Link show,
         @JsonProperty("previousepisode") Link previousepisode
 ) {}
