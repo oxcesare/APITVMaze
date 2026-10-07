@@ -58,6 +58,9 @@ logs/
 
 # Other files for JavaDOC
 javadoc/
-/docs/
+/docs/*
+!/docs/ai/
+/docs/ai/*
+!/docs/ai/AGENTS.md
 /target/site/apidocs/
 /target

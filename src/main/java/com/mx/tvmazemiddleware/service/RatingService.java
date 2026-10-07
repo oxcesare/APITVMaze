@@ -25,7 +25,6 @@ public class RatingService {
 
         if (!show.isPresent()) {
             return new RatingResponse("error", "Show not found");
-
         }
 
         Rating rating = new Rating(null, ratingRequest.showId(), ratingRequest.comment(), ratingRequest.rating());
