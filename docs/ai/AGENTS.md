@@ -8,7 +8,7 @@ APITVMaze es una API REST construida con Spring Boot que sirve como middleware p
 
 ## Arquitectura actual
 
-El proyecto usa Java 17, Spring Boot 3 y Maven. La aplicación sigue una arquitectura por capas:
+El proyecto usa Java 21, Spring Boot 3 y Maven. La aplicación sigue una arquitectura por capas:
 
 | Capa | Ubicación | Responsabilidad |
 |---|---|---|
@@ -37,7 +37,7 @@ Flujo general: **HTTP → controlador → servicio → cliente TVMaze y/o reposi
 3. **Usa los patrones del proyecto:** constructor para inyección de dependencias, tipos explícitos y DTOs para los límites HTTP/externos. Reutiliza componentes existentes antes de introducir abstracciones nuevas.
 4. **Maneja fallos con claridad:** no ocultes errores ni devuelvas respuestas de éxito cuando una operación haya fallado. Mantén el uso de excepciones específicas para los errores de TVMaze y del dominio.
 5. **Protege la configuración:** usa variables de entorno o configuración externa para secretos y credenciales. Nunca agregues valores reales de conexión, tokens o contraseñas al código o a este documento.
-6. **Mantén compatibilidad técnica:** conserva Java 17, Spring Boot y Maven, salvo que el plan requiera y justifique un cambio de plataforma.
+6. **Mantén compatibilidad técnica:** conserva Java 21, Spring Boot 3 y Maven, salvo que el plan requiera y justifique un cambio de plataforma.
 7. **Prueba los cambios:** actualiza o agrega pruebas en `src/test/java/` para cubrir comportamiento nuevo y regresiones. Ejecuta las pruebas Maven pertinentes; la suite existente se puede ejecutar con `mvn test`.
 8. **Limita el alcance:** no modifiques archivos ni comportamiento no relacionados con el objetivo del plan. Si una decisión afecta contratos, persistencia o arquitectura y no está definida, explica la incertidumbre y solicita aclaración antes de asumirla.
 9. **Actualiza documentación:** si cambian endpoints, configuración, arquitectura o instrucciones de ejecución, actualiza también la documentación correspondiente, incluido este archivo cuando aplique.
@@ -46,7 +46,7 @@ Flujo general: **HTTP → controlador → servicio → cliente TVMaze y/o reposi
 
 Completa esta sección antes de implementar una tarea. Usa pasos verificables y relaciona cada cambio con el código o contrato afectado. Si todavía no hay un cambio concreto, conserva los campos como plantilla.
 
-### Objetivo
+### Objetivo    
 
 <!-- Describe el problema que se resolverá y el resultado esperado. -->
 
