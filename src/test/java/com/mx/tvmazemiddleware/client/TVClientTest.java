@@ -23,7 +23,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import com.mx.tvmazemiddleware.exception.TvNotShowException;
+import com.mx.tvmazemiddleware.exception.TvShowSearchEmptyException;
 
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
@@ -112,7 +112,7 @@ class TVClientTest {
     }
 
     @Test
-    void lanzaTvNotShowCuandoBusquedaNoTieneResultados() {
+    void lanzaSearchEmptyCuandoBusquedaNoTieneResultados() {
         RestClient.Builder builder = RestClient.builder().baseUrl("http://localhost");
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         TVClient client = new TVClient(builder.build());
@@ -122,7 +122,7 @@ class TVClientTest {
                 .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
 
         assertThatThrownBy(() -> client.searchShows("zzzz"))
-                .isInstanceOf(TvNotShowException.class);
+                .isInstanceOf(TvShowSearchEmptyException.class);
 
         server.verify();
     }

@@ -6,6 +6,7 @@ import com.mx.tvmazemiddleware.dto.ShowResponse;
 import com.mx.tvmazemiddleware.exception.TvMazeRateLimitException;
 import com.mx.tvmazemiddleware.exception.TvMazeUnavailableException;
 import com.mx.tvmazemiddleware.exception.TvNotShowException;
+import com.mx.tvmazemiddleware.exception.TvShowSearchEmptyException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -107,7 +108,7 @@ public class TVClient {
                 throw new TvMazeRateLimitException("Se excedió el límite de peticiones", ex);
             }
             if (ex.getStatusCode().value() == 404) {
-                throw new TvNotShowException(String.valueOf(searchQuery));
+                throw new TvShowSearchEmptyException(String.valueOf(searchQuery));
             }
             throw new TvMazeUnavailableException(
                     "TVMaze respondió con un error HTTP " + ex.getStatusCode().value(), ex);
@@ -128,7 +129,7 @@ public class TVClient {
         }
 
         if (results == null || results.length == 0) {
-            throw new TvNotShowException(searchQuery);
+            throw new TvShowSearchEmptyException(searchQuery);
         }
 
         return Arrays.stream(results)

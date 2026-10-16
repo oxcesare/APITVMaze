@@ -2,11 +2,16 @@ package com.mx.tvmazemiddleware.controller;
 
 
 import com.mx.tvmazemiddleware.dto.EpisodeDetailResponse;
+import com.mx.tvmazemiddleware.exception.GlobalExceptionHandler;
 import com.mx.tvmazemiddleware.service.EpisodeService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 public class EpisodeController {
+
+    private static final Logger log = LoggerFactory.getLogger(EpisodeController.class);
 
     private final EpisodeService episodeService;
 
@@ -22,6 +27,7 @@ public class EpisodeController {
      */
     @GetMapping("/episodes/{id}")
     public EpisodeDetailResponse getEpisodeById(@PathVariable("id") Long episodeId) {
+        log.info("Thread: {}", Thread.currentThread().isVirtual());
         return episodeService.getEpisodeById(episodeId);
     }
 }
