@@ -41,16 +41,62 @@ class TVMazeServiceTest {
         show.setId(1L);
         show.setName("Girls");
 
-        Rating rating = new Rating("abc123", 1L, "Muy buena", 5);
+        Rating rating = new Rating("abc123", "usuario-1", 1L, "Muy buena", 5);
 
         when(tvClient.searchShows("girls")).thenReturn(List.of(show));
-        when(ratingRepository.findByShowId(1L)).thenReturn(List.of(rating));
+        when(ratingRepository.findByShowIdIn(List.of(1L))).thenReturn(List.of(rating));
 
         List<ShowResponse> result = tvMazeService.searchShows("girls");
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getComments()).hasSize(1);
         assertThat(result.get(0).getComments().get(0).comment()).isEqualTo("Muy buena");
+        verify(ratingRepository, times(1)).findByShowIdIn(List.of(1L));
+        verify(ratingRepository, never()).findByShowId(anyLong());
+    }
+
+    @Test
+    void showSinRatingsRecibeListaVacia() {
+        ShowResponse show = new ShowResponse();
+        show.setId(1L);
+        show.setName("Girls");
+
+        when(tvClient.searchShows("girls")).thenReturn(List.of(show));
+        when(ratingRepository.findByShowIdIn(List.of(1L))).thenReturn(List.of());
+
+        List<ShowResponse> result = tvMazeService.searchShows("girls");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getComments()).isNotNull().isEmpty();
+    }
+
+    @Test
+    void agrupaRatingsDeVariosUsuariosPorShow() {
+        ShowResponse girls = new ShowResponse();
+        girls.setId(1L);
+        girls.setName("Girls");
+
+        ShowResponse louie = new ShowResponse();
+        louie.setId(2L);
+        louie.setName("Louie");
+
+        Rating girlsRating1 = new Rating("rating-1", "usuario-1", 1L, "Muy buena", 5);
+        Rating girlsRating2 = new Rating("rating-2", "usuario-2", 1L, "Excelente", 4);
+        Rating louieRating = new Rating("rating-3", "usuario-1", 2L, "Divertida", 3);
+
+        when(tvClient.searchShows("comedy")).thenReturn(List.of(girls, louie));
+        when(ratingRepository.findByShowIdIn(List.of(1L, 2L)))
+                .thenReturn(List.of(girlsRating1, girlsRating2, louieRating));
+
+        List<ShowResponse> result = tvMazeService.searchShows("comedy");
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getComments())
+                .extracting(comment -> comment.comment())
+                .containsExactlyInAnyOrder("Muy buena", "Excelente");
+        assertThat(result.get(1).getComments())
+                .extracting(comment -> comment.comment())
+                .containsExactly("Divertida");
     }
 
     @Test
