@@ -4,6 +4,8 @@ import com.mx.tvmazemiddleware.dto.ShowDetailResponse;
 import com.mx.tvmazemiddleware.dto.rating.Rating;
 import com.mx.tvmazemiddleware.dto.rating.RatingRequest;
 import com.mx.tvmazemiddleware.dto.rating.RatingResponse;
+import com.mx.tvmazemiddleware.exception.RatingAlreadyExistsException;
+import com.mx.tvmazemiddleware.exception.RatingShowReferenceNotFoundException;
 import com.mx.tvmazemiddleware.repository.RatingRepository;
 import com.mx.tvmazemiddleware.repository.ShowRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 
@@ -35,7 +38,7 @@ class RatingServiceTest {
 
     @BeforeEach
     void setUp() {
-        ratingRequest = new RatingRequest(1L, "Excelente Serie!", 5);
+        ratingRequest = new RatingRequest(1L, "2", "Excelente Serie!", 5);
     }
 
 
@@ -45,10 +48,13 @@ class RatingServiceTest {
         ShowDetailResponse mockShow = mock(ShowDetailResponse.class);
 
         when(showRepository.findById(1L)).thenReturn(Optional.of(mockShow));
+        when(ratingRepository.save(any(Rating.class)))
+                .thenReturn(new Rating("abc123", "2", 1L, "Excelente Serie!", 5));
 
         RatingResponse response = ratingService.saveRating(ratingRequest);
 
         assertThat(response.status()).isEqualTo("success");
+        assertThat(response.ratingId()).isEqualTo("abc123");
 
         verify(ratingRepository, times(1)).save(any(Rating.class));
 
@@ -56,12 +62,24 @@ class RatingServiceTest {
 
     @Test
     void guardarCuandoShowNoExiste() {
-        when(showRepository.findById(1L)).thenReturn(Optional.empty());
+        RatingRequest request = new RatingRequest(0L, "2", "Comentario", 3);
+        when(showRepository.findById(0L)).thenReturn(Optional.empty());
 
-        RatingResponse response = ratingService.saveRating(ratingRequest);
-
-        assertThat(response.status()).isEqualTo("error");
+        assertThatThrownBy(() -> ratingService.saveRating(request))
+                .isInstanceOf(RatingShowReferenceNotFoundException.class)
+                .hasMessageContaining("ID 0");
         verify(ratingRepository, never()).save(any(Rating.class));
     }
 
+    @Test
+    void guardarCuandoRatingYaExiste() {
+        when(showRepository.findById(1L)).thenReturn(Optional.of(mock(ShowDetailResponse.class)));
+        when(ratingRepository.findByShowIdAndUserId(1L, "2"))
+                .thenReturn(Optional.of(new Rating("abc123", "2", 1L, "Excelente Serie!", 5)));
+
+        assertThatThrownBy(() -> ratingService.saveRating(ratingRequest))
+                .isInstanceOf(RatingAlreadyExistsException.class)
+                .hasMessageContaining("show con ID 1");
+        verify(ratingRepository, never()).save(any(Rating.class));
+    }
 }

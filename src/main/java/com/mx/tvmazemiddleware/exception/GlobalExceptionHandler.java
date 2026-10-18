@@ -26,6 +26,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     private static final URI SHOW_NOT_FOUND = URI.create("urn:tvmaze:problem:show-not-found");
+    private static final URI RATING_SHOW_REFERENCE_NOT_FOUND =
+            URI.create("urn:tvmaze:problem:rating-show-reference-not-found");
+    private static final URI RATING_ALREADY_EXISTS = URI.create("urn:tvmaze:problem:rating-already-exists");
     private static final URI SEARCH_NO_RESULTS = URI.create("urn:tvmaze:problem:search-no-results");
     private static final URI UPSTREAM_UNAVAILABLE = URI.create("urn:tvmaze:problem:upstream-unavailable");
     private static final URI RATE_LIMITED = URI.create("urn:tvmaze:problem:rate-limited");
@@ -37,6 +40,27 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
         pd.setType(SHOW_NOT_FOUND);
         pd.setTitle("Show no encontrado");
+        return pd;
+    }
+
+    @ExceptionHandler(RatingShowReferenceNotFoundException.class)
+    public ProblemDetail handleRatingShowReferenceNotFound(RatingShowReferenceNotFoundException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(
+                HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
+        pd.setType(RATING_SHOW_REFERENCE_NOT_FOUND);
+        pd.setTitle("Show referenciado no encontrado");
+        pd.setProperty("showId", ex.showId());
+        return pd;
+    }
+
+    @ExceptionHandler(RatingAlreadyExistsException.class)
+    public ProblemDetail handleRatingAlreadyExists(RatingAlreadyExistsException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        pd.setType(RATING_ALREADY_EXISTS);
+        pd.setTitle("La calificación ya existe");
+        pd.setProperty("showId", ex.showId());
+        pd.setProperty("userId", ex.userId());
+        pd.setProperty("ratingId", ex.ratingId());
         return pd;
     }
 

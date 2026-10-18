@@ -5,6 +5,8 @@ import com.mx.tvmazemiddleware.client.TVClient;
 import com.mx.tvmazemiddleware.dto.rating.Rating;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.mx.tvmazemiddleware.dto.RatingInfo;
 import com.mx.tvmazemiddleware.dto.ShowDetailResponse;
@@ -29,19 +31,19 @@ public class TVMazeService {
 
     public List<ShowResponse> searchShows(String searchQuery) {
         List<ShowResponse> shows = tvClient.searchShows(searchQuery);
-        shows.forEach(this::addCommentsToShow);
+        if (shows.isEmpty()) {
+            return shows;
+        }
+
+        List<Long> showIds = shows.stream().map(ShowResponse::getId).toList();
+
+        Map<Long, List<RatingInfo>> commentsByShowId = ratingRepository.findByShowIdIn(showIds).stream()
+                .collect(Collectors.groupingBy(
+                        Rating::showId,
+                        Collectors.mapping(r -> new RatingInfo(r.comment(), r.rating()), Collectors.toList())));
+
+        shows.forEach(show -> show.setComments(commentsByShowId.getOrDefault(show.getId(), List.of())));
         return shows;
-    }
-
-    private void addCommentsToShow(ShowResponse show) {
-        List<Rating> ratings = ratingRepository.findByShowId(show.getId());
-
-        List<RatingInfo> comments = ratings.stream()
-                .map(rating -> new RatingInfo(rating.comment(), rating.rating()))
-                .toList();
-
-        show.setComments(comments);
-
     }
 
     public ShowDetailResponse getShowById(Long showId) {

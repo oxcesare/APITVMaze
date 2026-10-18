@@ -2,6 +2,7 @@ package com.mx.tvmazemiddleware.exception;
 
 import com.mx.tvmazemiddleware.controller.TVMazeController;
 import com.mx.tvmazemiddleware.service.TVMazeService;
+import com.mx.tvmazemiddleware.util.ApiConstants;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -26,7 +27,7 @@ class GlobalExceptionHandlerTest {
     void showNoEncontradoTieneTypePropio() throws Exception {
         when(tvMazeService.getShowById(99L)).thenThrow(new TvNotShowException("99"));
 
-        mockMvc.perform(get("/shows/99"))
+        mockMvc.perform(get(ApiConstants.V1 + "/shows/99"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.type").value("urn:tvmaze:problem:show-not-found"));
     }
@@ -35,7 +36,7 @@ class GlobalExceptionHandlerTest {
     void busquedaSinResultadosTieneTypePropio() throws Exception {
         when(tvMazeService.searchShows("zzzz")).thenThrow(new TvShowSearchEmptyException("zzzz"));
 
-        mockMvc.perform(get("/search/shows").param("searchQuery", "zzzz"))
+        mockMvc.perform(get(ApiConstants.V1 + "/shows/search").param("searchQuery", "zzzz"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.type").value("urn:tvmaze:problem:search-no-results"));
     }
@@ -45,7 +46,7 @@ class GlobalExceptionHandlerTest {
         when(tvMazeService.getShowById(1L))
                 .thenThrow(new TvMazeRateLimitException("limite", new RuntimeException()));
 
-        mockMvc.perform(get("/shows/1"))
+        mockMvc.perform(get(ApiConstants.V1 + "/shows/1"))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.type").value("urn:tvmaze:problem:rate-limited"));
     }

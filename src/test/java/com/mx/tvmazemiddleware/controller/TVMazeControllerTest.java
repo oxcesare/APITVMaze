@@ -3,6 +3,7 @@ package com.mx.tvmazemiddleware.controller;
 import com.mx.tvmazemiddleware.dto.ShowDetailResponse;
 import com.mx.tvmazemiddleware.dto.ShowResponse;
 import com.mx.tvmazemiddleware.service.TVMazeService;
+import com.mx.tvmazemiddleware.util.ApiConstants;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -37,7 +38,7 @@ class TVMazeControllerTest {
 
         when(tvMazeService.searchShows("girls")).thenReturn(List.of(show));
 
-        mockMvc.perform(get("/search/shows").param("searchQuery", "girls"))
+        mockMvc.perform(get(ApiConstants.V1 + "/shows/search").param("searchQuery", "girls"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(1))
                 .andExpect(jsonPath("$[0].name").value("Girls"));
@@ -56,7 +57,7 @@ class TVMazeControllerTest {
 
         when(tvMazeService.getShowById(1L)).thenReturn(show);
 
-        mockMvc.perform(get("/shows/1"))
+        mockMvc.perform(get(ApiConstants.V1 + "/shows/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.name").value("Under the Dome"));

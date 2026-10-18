@@ -4,14 +4,15 @@ package com.mx.tvmazemiddleware.controller;
 import com.mx.tvmazemiddleware.dto.rating.RatingRequest;
 import com.mx.tvmazemiddleware.dto.rating.RatingResponse;
 import com.mx.tvmazemiddleware.service.RatingService;
+import com.mx.tvmazemiddleware.util.ApiConstants;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
+@RequestMapping(ApiConstants.V1 + "/shows")
 public class RatingController {
 
 
@@ -19,13 +20,18 @@ public class RatingController {
 
     private final RatingService ratingService;
 
+    /**
+     * Inyeccion de dependencias por constructor
+     *
+     * @param ratingService
+     */
     public RatingController(RatingService ratingService) {
         this.ratingService = ratingService;
     }
 
     @PostMapping("/ratings")
+    @ResponseStatus(HttpStatus.CREATED)
     public RatingResponse createRating(@Valid @RequestBody RatingRequest ratingRequest) {
-        log.info("Thread: {}", Thread.currentThread().isVirtual());
         return ratingService.saveRating(ratingRequest);
     }
 }
