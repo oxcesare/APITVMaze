@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mx.tvmazemiddleware.dto.rating.RatingRequest;
 import com.mx.tvmazemiddleware.dto.rating.RatingResponse;
 import com.mx.tvmazemiddleware.exception.RatingAlreadyExistsException;
+import com.mx.tvmazemiddleware.exception.RatingShowNotFoundException;
 import com.mx.tvmazemiddleware.exception.RatingShowReferenceNotFoundException;
 import com.mx.tvmazemiddleware.exception.TvMazeRateLimitException;
 import com.mx.tvmazemiddleware.exception.TvMazeUnavailableException;
@@ -17,10 +18,22 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.mx.tvmazemiddleware.dto.rating.Rating;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.SliceImpl;
+
+import java.util.List;
+
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
@@ -66,7 +79,7 @@ class RatingControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.type").value("urn:tvmaze:problem:rating-show-reference-not-found"))
+                .andExpect(jsonPath("$.type").value("urn:tvmaze:problem:rating-show-not-registered"))
                 .andExpect(jsonPath("$.detail")
                         .value("No se encontró en nuestra base de datos un show con ID 0; no se puede guardar la calificación."))
                 .andExpect(jsonPath("$.showId").value(0))
@@ -112,5 +125,45 @@ class RatingControllerTest {
                 .andExpect(jsonPath("$.type").value("urn:tvmaze:problem:rating-already-exists"))
                 .andExpect(jsonPath("$.ratingId").value("abc123"))
                 .andExpect(jsonPath("$.status").value(409));
+    }
+
+    @Test
+    void listarRatingsSinPaginacionDevuelvePrimeraPaginaPorDefectoSinUserId() throws Exception {
+        when(ratingService.findRatingsByShowId(eq(1L), eq(PageRequest.of(0, 20))))
+                .thenReturn(new SliceImpl<>(List.of(new Rating("abc123", "user-42", 1L, "Excelente", 5)),
+                        PageRequest.of(0, 20), false));
+
+        mockMvc.perform(get("/api/v1/shows/ratings").param("showId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.hasNext").value(false))
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id").value("abc123"))
+                .andExpect(jsonPath("$.content[0].comment").value("Excelente"))
+                .andExpect(jsonPath("$.content[0].rating").value(5))
+                .andExpect(content().string(not(containsString("userId"))))
+                .andExpect(content().string(not(containsString("user-42"))));
+    }
+
+    @Test
+    void listarRatingsDeShowNoRegistradoDevuelveNotFound() throws Exception {
+        when(ratingService.findRatingsByShowId(eq(999L), any()))
+                .thenThrow(new RatingShowNotFoundException(999L));
+
+        mockMvc.perform(get("/api/v1/shows/ratings").param("showId", "999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:tvmaze:problem:rating-show-not-registered"))
+                .andExpect(jsonPath("$.showId").value(999))
+                .andExpect(jsonPath("$.status").value(404));
+    }
+
+    @Test
+    void listarRatingsSinShowIdDevuelveBadRequest() throws Exception {
+        mockMvc.perform(get("/api/v1/shows/ratings"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:tvmaze:problem:bad-request"));
+
+        verifyNoInteractions(ratingService);
     }
 }

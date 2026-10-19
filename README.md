@@ -88,9 +88,9 @@ Los errores se devuelven como `ProblemDetail` (RFC 7807) con un `type` estable d
 | 200 | - | Consultas GET exitosas |
 | 201 | - | Rating creado (`POST /ratings`) |
 | 400 | `validation-error` | Body inválido, vacío, mal formado o con tipos incorrectos |
-| 404 | `show-not-found` / `search-no-results` | Show inexistente o búsqueda sin resultados |
+| 404 | `show-not-found` / `search-no-results` / `rating-show-not-registered` | Show inexistente, búsqueda sin resultados, o show sin registrar al listar ratings |
 | 409 | `rating-already-exists` | El usuario ya calificó ese show |
-| 422 | `rating-show-reference-not-found` | El show del rating no existe en nuestra base de datos |
+| 422 | `rating-show-not-registered` | El show del rating no existe en nuestra base de datos |
 | 429 | `rate-limited` | TVMaze limitó las peticiones |
 | 500 | `internal-error` | Error inesperado |
 | 503 | `upstream-unavailable` | TVMaze no está disponible |

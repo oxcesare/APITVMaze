@@ -7,6 +7,9 @@ import com.mx.tvmazemiddleware.exception.RatingAlreadyExistsException;
 import com.mx.tvmazemiddleware.exception.RatingShowReferenceNotFoundException;
 import com.mx.tvmazemiddleware.repository.RatingRepository;
 import com.mx.tvmazemiddleware.repository.ShowRepository;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.SliceImpl;
 import org.springframework.stereotype.Service;
 
 
@@ -39,5 +42,9 @@ public class RatingService {
         Rating rating = new Rating(null, ratingRequest.userId(), ratingRequest.showId(), ratingRequest.comment(), ratingRequest.rating());
         Rating saved = ratingRepository.save(rating);
         return new RatingResponse("success", "Rating saved successfully", saved.id());
+    }
+
+    public Slice<Rating> findRatingsByShowId(Long showId, Pageable pageable) {
+        return new SliceImpl<>(java.util.List.of());
     }
 }

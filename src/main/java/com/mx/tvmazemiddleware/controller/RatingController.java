@@ -1,6 +1,9 @@
 package com.mx.tvmazemiddleware.controller;
 
 
+import com.mx.tvmazemiddleware.dto.rating.Rating;
+import com.mx.tvmazemiddleware.dto.rating.RatingItemResponse;
+import com.mx.tvmazemiddleware.dto.rating.RatingPageResponse;
 import com.mx.tvmazemiddleware.dto.rating.RatingRequest;
 import com.mx.tvmazemiddleware.dto.rating.RatingResponse;
 import com.mx.tvmazemiddleware.service.RatingService;
@@ -8,8 +11,12 @@ import com.mx.tvmazemiddleware.util.ApiConstants;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping(ApiConstants.V1 + "/shows")
@@ -33,5 +40,15 @@ public class RatingController {
     @ResponseStatus(HttpStatus.CREATED)
     public RatingResponse createRating(@Valid @RequestBody RatingRequest ratingRequest) {
         return ratingService.saveRating(ratingRequest);
+    }
+
+    @GetMapping("/ratings")
+    // modificar showID para que sea no requerido y que si no se pasa, se devuelvan todos los ratings
+    public RatingPageResponse listRatings(@RequestParam Long showId, Pageable pageable) {
+        Slice<Rating> ratings = ratingService.findRatingsByShowId(showId, pageable);
+        List<RatingItemResponse> content = ratings.getContent().stream()
+                .map(r -> new RatingItemResponse(r.id(), r.showId(), r.comment(), r.rating()))
+                .toList();
+        return new RatingPageResponse(content, ratings.getNumber(), ratings.getSize(), ratings.hasNext());
     }
 }

@@ -26,8 +26,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     private static final URI SHOW_NOT_FOUND = URI.create("urn:tvmaze:problem:show-not-found");
-    private static final URI RATING_SHOW_REFERENCE_NOT_FOUND =
-            URI.create("urn:tvmaze:problem:rating-show-reference-not-found");
+    private static final URI RATING_SHOW_NOT_REGISTERED =
+            URI.create("urn:tvmaze:problem:rating-show-not-registered");
     private static final URI RATING_ALREADY_EXISTS = URI.create("urn:tvmaze:problem:rating-already-exists");
     private static final URI SEARCH_NO_RESULTS = URI.create("urn:tvmaze:problem:search-no-results");
     private static final URI UPSTREAM_UNAVAILABLE = URI.create("urn:tvmaze:problem:upstream-unavailable");
@@ -45,11 +45,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(RatingShowReferenceNotFoundException.class)
     public ProblemDetail handleRatingShowReferenceNotFound(RatingShowReferenceNotFoundException ex) {
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(
-                HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
-        pd.setType(RATING_SHOW_REFERENCE_NOT_FOUND);
-        pd.setTitle("Show referenciado no encontrado");
-        pd.setProperty("showId", ex.showId());
+        return showNotRegisteredProblem(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), ex.showId());
+    }
+
+    @ExceptionHandler(RatingShowNotFoundException.class)
+    public ProblemDetail handleRatingShowNotFound(RatingShowNotFoundException ex) {
+        return showNotRegisteredProblem(HttpStatus.NOT_FOUND, ex.getMessage(), ex.showId());
+    }
+
+    private ProblemDetail showNotRegisteredProblem(HttpStatus status, String detail, Long showId) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(status, detail);
+        pd.setType(RATING_SHOW_NOT_REGISTERED);
+        pd.setTitle("Show no registrado");
+        pd.setProperty("showId", showId);
         return pd;
     }
 
