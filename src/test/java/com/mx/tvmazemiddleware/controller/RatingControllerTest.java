@@ -4,6 +4,7 @@ package com.mx.tvmazemiddleware.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mx.tvmazemiddleware.dto.rating.RatingRequest;
 import com.mx.tvmazemiddleware.dto.rating.RatingResponse;
+import com.mx.tvmazemiddleware.exception.InvalidSortFieldException;
 import com.mx.tvmazemiddleware.exception.RatingAlreadyExistsException;
 import com.mx.tvmazemiddleware.exception.RatingShowNotFoundException;
 import com.mx.tvmazemiddleware.exception.RatingShowReferenceNotFoundException;
@@ -19,7 +20,11 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.mx.tvmazemiddleware.dto.rating.Rating;
+import org.junit.jupiter.api.Assertions;
+import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.domain.SliceImpl;
 
 import java.util.List;
@@ -29,6 +34,7 @@ import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -165,5 +171,110 @@ class RatingControllerTest {
                 .andExpect(jsonPath("$.type").value("urn:tvmaze:problem:bad-request"));
 
         verifyNoInteractions(ratingService);
+    }
+
+    @Test
+    void listarRatingsConSortNoPermitidoDevuelveBadRequest() throws Exception {
+        when(ratingService.findRatingsByShowId(eq(1L), any()))
+                .thenThrow(new InvalidSortFieldException("userId"));
+
+        mockMvc.perform(get("/api/v1/shows/ratings")
+                        .param("showId", "1")
+                        .param("sort", "userId"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:tvmaze:problem:validation-error"))
+                .andExpect(jsonPath("$.title").value("Error de validación"))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.field").value("userId"))
+                .andExpect(jsonPath("$.errors").doesNotExist())
+                .andExpect(content().string(not(containsString("allowed"))))
+                .andExpect(content().string(not(containsString("permitidos"))))
+                .andExpect(content().string(not(containsString("\"rating\""))));
+    }
+
+    @Test
+    void listarRatingsConPaginaTamanioYOrdenPersonalizados() throws Exception {
+
+        Pageable esperado = PageRequest.of(2, 5, Sort.by(Sort.Direction.DESC, "rating"));
+
+        when(ratingService.findRatingsByShowId(eq(1L), any(Pageable.class)))
+                .thenReturn(new SliceImpl<>(List.of(new Rating("abc123", "user-42", 1L, "Excelente", 5)),
+                        esperado, true));
+
+        mockMvc.perform(get("/api/v1/shows/ratings")
+                        .param("showId", "1")
+                        .param("page", "2")
+                        .param("size", "5")
+                        .param("sort", "rating,desc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(2))
+                .andExpect(jsonPath("$.size").value(5))
+                .andExpect(jsonPath("$.hasNext").value(true))
+                .andExpect(jsonPath("$.content.length()").value(1));
+
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(ratingService).findRatingsByShowId(eq(1L), captor.capture());
+        Pageable recibido = captor.getValue();
+        Assertions.assertEquals(2, recibido.getPageNumber());
+        Assertions.assertEquals(5, recibido.getPageSize());
+        Assertions.assertEquals(Sort.by(Sort.Direction.DESC, "rating"), recibido.getSort());
+    }
+
+    @Test
+    void listarRatingsConSizeMayorAlMaximoDevuelveSizeEfectivo() throws Exception {
+        when(ratingService.findRatingsByShowId(eq(1L), any(Pageable.class)))
+                .thenAnswer(inv -> new SliceImpl<>(
+                        List.of(new Rating("abc123", "user-42", 1L, "Excelente", 5)),
+                        inv.<Pageable>getArgument(1), false));
+
+        mockMvc.perform(get("/api/v1/shows/ratings")
+                        .param("showId", "1")
+                        .param("size", "100000"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.size").value(100));
+
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(ratingService).findRatingsByShowId(eq(1L), captor.capture());
+        Assertions.assertEquals(100, captor.getValue().getPageSize());
+    }
+
+
+    @Test
+    void listarRatingsConSizeCeroUsaElTamanioPorDefecto() throws Exception {
+        mockListado();
+
+        mockMvc.perform(get("/api/v1/shows/ratings")
+                        .param("showId", "1")
+                        .param("size", "0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.size").value(20));
+
+        Assertions.assertEquals(20, pageableRecibido().getPageSize());
+    }
+
+    @Test
+    void listarRatingsConPaginaNegativaUsaLaPrimeraPagina() throws Exception {
+        mockListado();
+
+        mockMvc.perform(get("/api/v1/shows/ratings")
+                        .param("showId", "1")
+                        .param("page", "-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(0));
+
+        Assertions.assertEquals(0, pageableRecibido().getPageNumber());
+    }
+
+    private void mockListado() {
+        when(ratingService.findRatingsByShowId(eq(1L), any(Pageable.class)))
+                .thenAnswer(inv -> new SliceImpl<>(
+                        List.of(new Rating("abc123", "user-42", 1L, "Excelente", 5)),
+                        inv.<Pageable>getArgument(1), false));
+    }
+
+    private Pageable pageableRecibido() {
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(ratingService).findRatingsByShowId(eq(1L), captor.capture());
+        return captor.getValue();
     }
 }

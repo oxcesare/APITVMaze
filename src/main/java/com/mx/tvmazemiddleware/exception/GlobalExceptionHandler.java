@@ -35,6 +35,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static final URI INTERNAL_ERROR = URI.create("urn:tvmaze:problem:internal-error");
     private static final URI VALIDATION_ERROR = URI.create("urn:tvmaze:problem:validation-error");
 
+    @ExceptionHandler(InvalidSortFieldException.class)
+    public ProblemDetail handleInvalidSortField(InvalidSortFieldException ex) {
+        log.warn("Criterio de ordenamiento no permitido: {}", ex.field());
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        pd.setType(VALIDATION_ERROR);
+        pd.setTitle("Error de validación");
+        pd.setProperty("field", ex.field());
+        return pd;
+    }
+
     @ExceptionHandler(TvNotShowException.class)
     public ProblemDetail handleNotFound(TvNotShowException ex) {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
