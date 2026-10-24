@@ -9,6 +9,9 @@ import com.mx.tvmazemiddleware.exception.RatingShowNotFoundException;
 import com.mx.tvmazemiddleware.exception.RatingShowReferenceNotFoundException;
 import com.mx.tvmazemiddleware.repository.RatingRepository;
 import com.mx.tvmazemiddleware.repository.ShowRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import java.util.ArrayList;
@@ -22,8 +25,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class RatingService {
 
-    // Comparación exacta (sensible a mayúsculas): las propiedades del repositorio también lo son,
-    // así que "Rating" o "ID" se rechazan.
+    private static final Logger log = LoggerFactory.getLogger(RatingService.class);
+
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("id", "rating");
 
     private final ShowRepository showRepository;
@@ -50,7 +53,25 @@ public class RatingService {
         }
 
         Rating rating = new Rating(null, ratingRequest.userId(), ratingRequest.showId(), ratingRequest.comment(), ratingRequest.rating());
-        Rating saved = ratingRepository.save(rating);
+        Rating saved;
+        try {
+            saved = ratingRepository.save(rating);
+        } catch (DuplicateKeyException e) {
+            var existing = ratingRepository.findByShowIdAndUserId(rating.showId(), rating.userId());
+            if (existing.isPresent()) {
+                throw new RatingAlreadyExistsException(rating.showId(), rating.userId(), existing.get().id());
+            }
+            log.warn("DuplicateKeyException sin rating existente al consultar; reintentando save. showId={}, userId={}",
+                    rating.showId(), rating.userId());
+            try {
+                saved = ratingRepository.save(rating);
+            } catch (DuplicateKeyException retryError) {
+                log.warn("El reintento de save volvió a fallar por duplicado. showId={}, userId={}",
+                        rating.showId(), rating.userId());
+                throw new RatingAlreadyExistsException(rating.showId(), rating.userId(), null);
+            }
+        }
+
         return new RatingResponse("success", "Rating saved successfully", saved.id());
     }
 

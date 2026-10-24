@@ -43,7 +43,6 @@ public class RatingController {
     }
 
     @GetMapping("/ratings")
-    // modificar showID para que sea no requerido y que si no se pasa, se devuelvan todos los ratings
     public RatingPageResponse listRatings(@RequestParam Long showId, Pageable pageable) {
         Slice<Rating> ratings = ratingService.findRatingsByShowId(showId, pageable);
         List<RatingItemResponse> content = ratings.getContent().stream()

@@ -30,6 +30,7 @@ import org.springframework.data.domain.SliceImpl;
 import java.util.List;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.mockito.ArgumentMatchers.any;
@@ -130,6 +131,23 @@ class RatingControllerTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type").value("urn:tvmaze:problem:rating-already-exists"))
                 .andExpect(jsonPath("$.ratingId").value("abc123"))
+                .andExpect(jsonPath("$.status").value(409));
+    }
+
+    @Test
+    void errorCuandoElRatingYaExisteSinIdOmiteElCampoRatingId() throws Exception {
+        RatingRequest request = new RatingRequest(1L, "2", "Comentario", 3);
+        when(ratingService.saveRating(any(RatingRequest.class)))
+                .thenThrow(new RatingAlreadyExistsException(1L, "2", null));
+
+        mockMvc.perform(post(ApiConstants.V1 + "/shows/ratings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:tvmaze:problem:rating-already-exists"))
+                .andExpect(jsonPath("$.showId").value(1))
+                .andExpect(jsonPath("$.userId").value("2"))
+                .andExpect(jsonPath("$", not(hasKey("ratingId"))))
                 .andExpect(jsonPath("$.status").value(409));
     }
 

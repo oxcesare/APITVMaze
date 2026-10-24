@@ -78,7 +78,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         pd.setTitle("La calificación ya existe");
         pd.setProperty("showId", ex.showId());
         pd.setProperty("userId", ex.userId());
-        pd.setProperty("ratingId", ex.ratingId());
+        if (ex.ratingId() != null) {
+            pd.setProperty("ratingId", ex.ratingId());
+        }
         return pd;
     }
 

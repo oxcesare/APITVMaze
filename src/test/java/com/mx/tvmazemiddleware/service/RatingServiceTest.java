@@ -17,6 +17,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -90,6 +91,42 @@ class RatingServiceTest {
                 .isInstanceOf(RatingAlreadyExistsException.class)
                 .hasMessageContaining("show con ID 1");
         verify(ratingRepository, never()).save(any(Rating.class));
+    }
+
+    @Test
+    void guardarCuandoDuplicateKeyEnCarreraLanzaRatingAlreadyExists() {
+        var existente = new Rating("abc123", "2", 1L, "Excelente Serie!", 5);
+        when(showRepository.findById(1L)).thenReturn(Optional.of(mock(ShowDetailResponse.class)));
+        when(ratingRepository.findByShowIdAndUserId(1L, "2"))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(existente));
+        when(ratingRepository.save(any(Rating.class))).thenThrow(new DuplicateKeyException("duplicado"));
+
+        assertThatThrownBy(() -> ratingService.saveRating(ratingRequest))
+                .isInstanceOfSatisfying(RatingAlreadyExistsException.class,
+                        ex -> assertThat(ex.ratingId()).isEqualTo("abc123"));
+
+        verify(ratingRepository, times(2)).findByShowIdAndUserId(1L, "2");
+    }
+
+
+
+    @Test
+    void guardarCuandoDuplicateKeyPersisteTrasReintentoLanzaRatingAlreadyExistsSinId() {
+        when(showRepository.findById(1L)).thenReturn(Optional.of(mock(ShowDetailResponse.class)));
+        when(ratingRepository.findByShowIdAndUserId(1L, "2")).thenReturn(Optional.empty());
+        when(ratingRepository.save(any(Rating.class)))
+                .thenThrow(new DuplicateKeyException("duplicado"))
+                .thenThrow(new DuplicateKeyException("duplicado"));
+
+        assertThatThrownBy(() -> ratingService.saveRating(ratingRequest))
+                .isInstanceOfSatisfying(RatingAlreadyExistsException.class, ex -> {
+                    assertThat(ex.ratingId()).isNull();
+                    assertThat(ex.showId()).isEqualTo(1L);
+                    assertThat(ex.userId()).isEqualTo("2");
+                });
+
+        verify(ratingRepository, times(2)).save(any(Rating.class));
     }
 
     @Test
@@ -181,6 +218,23 @@ class RatingServiceTest {
         assertThat(enviado.getPageNumber()).isEqualTo(1);
         assertThat(enviado.getPageSize()).isEqualTo(10);
 
+    }
+
+    @Test
+    void guardarCuandoDuplicateKeyYElRegistroDesaparecioReintentaYGuarda() {
+        when(showRepository.findById(1L)).thenReturn(Optional.of(mock(ShowDetailResponse.class)));
+        when(ratingRepository.findByShowIdAndUserId(1L, "2")).thenReturn(Optional.empty());
+        when(ratingRepository.save(any(Rating.class)))
+                .thenThrow(new DuplicateKeyException("duplicado"))
+                .thenReturn(new Rating("abc123", "2", 1L, "Excelente Serie!", 5));
+
+        RatingResponse response = ratingService.saveRating(ratingRequest);
+
+        assertThat(response.status()).isEqualTo("success");
+        assertThat(response.ratingId()).isEqualTo("abc123");
+
+        verify(ratingRepository, times(2)).save(any(Rating.class));
+        verify(ratingRepository, times(2)).findByShowIdAndUserId(1L, "2");
     }
 
 }

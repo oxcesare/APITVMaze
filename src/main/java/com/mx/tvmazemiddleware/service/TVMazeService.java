@@ -31,6 +31,7 @@ public class TVMazeService {
 
     public List<ShowResponse> searchShows(String searchQuery) {
         List<ShowResponse> shows = tvClient.searchShows(searchQuery);
+
         if (shows.isEmpty()) {
             return shows;
         }

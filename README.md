@@ -100,4 +100,5 @@ Los errores se devuelven como `ProblemDetail` (RFC 7807) con un `type` estable d
 - **201 en `POST /ratings`**: se crea un recurso nuevo; la respuesta incluye `ratingId`.
 - **400 vs 422 vs 409**: 400 se reserva para requests mal formados o que no pasan validación. 422 indica que la request es válida sintácticamente pero referencia un show que no existe en nuestra base. 409 indica que la request es válida pero choca con el estado actual (ya existe un rating del mismo `userId` para el `showId`).
 - **Rating duplicado**: antes se respondía con éxito HTTP y `status: "error"` en el body. Ahora se lanza `RatingAlreadyExistsException` y se responde 409 con `showId`, `userId` y el `ratingId` existente, para que el cliente pueda distinguirlo sin inspeccionar el body de un 201.
+- **409 sin `ratingId`**: si el duplicado ocurre en una carrera y el reintento de guardado también choca, el id del rating existente no se conoce. En ese caso el campo `ratingId` se omite del body (no viene como `null`); `showId` y `userId` siempre están presentes.
 - **Errores de TVMaze**: 429 y 503 se propagan como tales; el detalle interno no se expone al cliente.
