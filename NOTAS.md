@@ -338,3 +338,12 @@ public record RatingRequest(
 - [ ] Mensajes en español para los errores por defecto de Spring.
 - [ ] `ShowResponse` como `record` y renombrar una de las dos clases `Rating`.
 - [ ] Traer a memoria todos los ratings de la búsqueda: revisar si el volumen crece.
+
+
+**La protección CSRF defiende frente a credenciales que el navegador adjunta automáticamente (cookies).**
+
+Esta API usa Authorization: Bearer, que solo lo añade el código de la aplicación cliente y nunca se 
+adjunta solo; además la API es stateless y no hay sesión. Por eso se desactiva. Condición: 
+si algún día el token pasa a una cookie, hay que reactivarla.
+
+

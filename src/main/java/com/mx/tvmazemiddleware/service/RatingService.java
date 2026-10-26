@@ -12,14 +12,15 @@ import com.mx.tvmazemiddleware.repository.ShowRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
-import org.springframework.stereotype.Service;
 
 
 @Service
@@ -95,5 +96,9 @@ public class RatingService {
 
         Pageable sorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(orders));
         return ratingRepository.findByShowId(showId, sorted);
+    }
+
+    public void deleteById(Long ratingId) {
+        ratingRepository.deleteById(String.valueOf(ratingId));
     }
 }
