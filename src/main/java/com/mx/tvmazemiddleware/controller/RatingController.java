@@ -1,11 +1,7 @@
 package com.mx.tvmazemiddleware.controller;
 
 
-import com.mx.tvmazemiddleware.dto.rating.Rating;
-import com.mx.tvmazemiddleware.dto.rating.RatingItemResponse;
-import com.mx.tvmazemiddleware.dto.rating.RatingPageResponse;
-import com.mx.tvmazemiddleware.dto.rating.RatingRequest;
-import com.mx.tvmazemiddleware.dto.rating.RatingResponse;
+import com.mx.tvmazemiddleware.dto.rating.*;
 import com.mx.tvmazemiddleware.service.RatingService;
 import com.mx.tvmazemiddleware.util.ApiConstants;
 import jakarta.validation.Valid;
@@ -18,8 +14,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.util.List;
 
@@ -71,7 +65,7 @@ public class RatingController {
     @DeleteMapping("/ratings/{ratingId}")
     @PreAuthorize("hasRole('ADMIN')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteRating(@PathVariable("ratingId") Long ratingId) {
+    public void deleteRating(@PathVariable("ratingId") String ratingId) {
         ratingService.deleteById(ratingId);
     }
 }

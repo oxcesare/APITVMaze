@@ -334,13 +334,12 @@ class RatingControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void borrarRatingConRolAdminDevuelve204() throws Exception {
-        String ratingId = "123";
+        String ratingId = "6ad2a0b1dffd796377c6c49c";
 
         mockMvc.perform(delete(ApiConstants.V1 + "/shows/ratings/" + ratingId))
                 .andExpect(status().isNoContent());
 
-
-        verify(ratingService).deleteById(eq(123L));
+        verify(ratingService).deleteById(eq(ratingId));
     }
 
     @Test

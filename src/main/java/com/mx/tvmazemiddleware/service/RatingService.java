@@ -98,7 +98,7 @@ public class RatingService {
         return ratingRepository.findByShowId(showId, sorted);
     }
 
-    public void deleteById(Long ratingId) {
-        ratingRepository.deleteById(String.valueOf(ratingId));
+    public void deleteById(String ratingId) {
+        ratingRepository.deleteById(ratingId);
     }
 }

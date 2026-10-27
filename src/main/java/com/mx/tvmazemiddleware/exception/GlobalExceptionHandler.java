@@ -1,6 +1,7 @@
 package com.mx.tvmazemiddleware.exception;
 
 
+import com.mx.tvmazemiddleware.util.ApiConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -35,7 +36,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static final URI INTERNAL_ERROR = URI.create("urn:tvmaze:problem:internal-error");
     private static final URI VALIDATION_ERROR = URI.create("urn:tvmaze:problem:validation-error");
     private static final URI INVALID_CREDENTIALS = URI.create("urn:tvmaze:problem:invalid-credentials");
-    private static final URI FORBIDDEN_ACCESS = URI.create("urn:tvmaze:problem:forbidden");
 
     @ExceptionHandler(InvalidSortFieldException.class)
     public ProblemDetail handleInvalidSortField(InvalidSortFieldException ex) {
@@ -174,10 +174,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
     public ProblemDetail handleAccessDenied(org.springframework.security.access.AccessDeniedException ex) {
         log.warn("Acceso denegado: {}", ex.getMessage());
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(
-                HttpStatus.FORBIDDEN, "No cuentas con los permisos necesarios para acceder a este recurso");
-        pd.setType(FORBIDDEN_ACCESS);
-        pd.setTitle("Acceso prohibido");
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ApiConstants.FORBIDDEN_DETAIL);
+        pd.setType(ApiConstants.FORBIDDEN_TYPE);
+        pd.setTitle(ApiConstants.FORBIDDEN_TITLE);
         return pd;
     }
 }
