@@ -1,6 +1,7 @@
 package com.mx.tvmazemiddleware.security;
 
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
@@ -21,11 +22,8 @@ class JwtAuthenticationConverterTest {
                 .expiresAt(Instant.now().plusSeconds(900))
                 .build();
 
-        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
-        var grantedAuthoritiesConverter = new org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter();
-        grantedAuthoritiesConverter.setAuthoritiesClaimName("roles");
-        grantedAuthoritiesConverter.setAuthorityPrefix("ROLE_");
-        converter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
+        JwtAuthenticationConverter converter =
+                new SecurityConfig(new ObjectMapper()).jwtAuthenticationConverter();
 
         var authentication = converter.convert(jwt);
 

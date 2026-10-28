@@ -343,6 +343,25 @@ class RatingControllerTest {
     }
 
     @Test
+    void borrarRatingConBearerTokenConRolAdminPasaPorElConversorYDevuelve204() throws Exception {
+        String ratingId = "6ad2a0b1dffd796377c6c49c";
+        org.springframework.security.oauth2.jwt.Jwt token = org.springframework.security.oauth2.jwt.Jwt.withTokenValue("tok")
+                .header("alg", "none")
+                .subject("1")
+                .claim("roles", List.of("ADMIN"))
+                .issuedAt(java.time.Instant.now())
+                .expiresAt(java.time.Instant.now().plusSeconds(900))
+                .build();
+        when(jwtDecoder.decode("tok")).thenReturn(token);
+
+        mockMvc.perform(delete(ApiConstants.V1 + "/shows/ratings/" + ratingId)
+                        .header("Authorization", "Bearer tok"))
+                .andExpect(status().isNoContent());
+
+        verify(ratingService).deleteById(eq(ratingId));
+    }
+
+    @Test
     void crearRatingExtraeUserIdDelToken() throws Exception {
         String jsonBody = "{\"showId\": 1, \"comment\": \"Excelente\", \"rating\": 5, \"userId\": \"otro\"}";
 

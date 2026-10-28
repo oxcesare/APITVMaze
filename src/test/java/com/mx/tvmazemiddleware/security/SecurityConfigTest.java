@@ -2,6 +2,7 @@ package com.mx.tvmazemiddleware.security;
 
 import com.mx.tvmazemiddleware.controller.TVMazeController;
 import com.mx.tvmazemiddleware.service.TVMazeService;
+import com.mx.tvmazemiddleware.util.ApiConstants;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -38,5 +39,20 @@ class SecurityConfigTest {
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type").value("urn:tvmaze:problem:forbidden"))
                 .andExpect(jsonPath("$.status").value(403));
+    }
+
+    @Test
+    void actuatorSinCredencialesDevuelve401ProblemJson() throws Exception {
+        mockMvc.perform(get("/actuator/beans"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:tvmaze:problem:unauthorized"))
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
+    void getLoginSinCredencialesDevuelve401() throws Exception {
+        mockMvc.perform(get(ApiConstants.V1 + "/auth/login"))
+                .andExpect(status().isUnauthorized());
     }
 }

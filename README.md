@@ -48,11 +48,15 @@ mvn clean install
 desde la Terminal:
 
 export MONGODB_URI="mongodb+srv://usuario:password@cluster.mongodb.net/tvmaze?retryWrites=true&w=majority"
+export ADMIN_USERNAME="admin"
+export ADMIN_PASSWORD="una-clave-segura"
 mvn spring-boot:run
 
 3. Accede a la API en http://localhost:8080
 
 4. La aplicación ya esta conectada con la base de datos de MongoDB Atlas y no hay restrcciones de IP
+
+Al iniciar, la aplicación crea el usuario administrador únicamente si no existe. Configura `ADMIN_USERNAME` y `ADMIN_PASSWORD`; la contraseña se almacena con BCrypt.
 
 ### Endpoints 
 
