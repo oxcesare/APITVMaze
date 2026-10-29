@@ -3,10 +3,9 @@ package com.mx.tvmazemiddleware.client;
 import com.mx.tvmazemiddleware.dto.EpisodeDetailResponse;
 import com.mx.tvmazemiddleware.dto.ShowDetailResponse;
 import com.mx.tvmazemiddleware.dto.ShowResponse;
-import com.mx.tvmazemiddleware.exception.TvMazeRateLimitException;
-import com.mx.tvmazemiddleware.exception.TvMazeUnavailableException;
-import com.mx.tvmazemiddleware.exception.TvNotShowException;
-import com.mx.tvmazemiddleware.exception.TvShowSearchEmptyException;
+import com.mx.tvmazemiddleware.exception.*;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -57,6 +56,11 @@ public class TVClient {
         return episodeDetailResponse;
     }
 
+    @Retryable(retryFor = {
+            TvMazeTimeoutException.class,
+            TvMazeUnavailableException.class
+    }, maxAttempts = 2,
+            backoff = @Backoff(delay = 0))
     public ShowDetailResponse getShowById(Long showId) {
 
         ShowDetailResponse showDetailResponse = null;
@@ -78,7 +82,7 @@ public class TVClient {
         } catch (ResourceAccessException ex) {
             if (hasCause(ex, SocketTimeoutException.class)
                     || hasCause(ex, HttpTimeoutException.class)) {
-                throw new TvMazeUnavailableException("Timeout al consultar TVMaze", ex);
+                throw new TvMazeTimeoutException("Timeout al consultar TVMaze", ex);
             }
 
             if (hasCause(ex, ConnectException.class)) {
@@ -115,7 +119,7 @@ public class TVClient {
         } catch (ResourceAccessException ex) {
             if (hasCause(ex, SocketTimeoutException.class)
                     || hasCause(ex, HttpTimeoutException.class)) {
-                throw new TvMazeUnavailableException("Timeout al consultar TVMaze", ex);
+                throw new TvMazeTimeoutException("Timeout al consultar TVMaze", ex);
             }
 
             if (hasCause(ex, ConnectException.class)) {

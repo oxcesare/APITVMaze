@@ -13,6 +13,10 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.net.URI;
 
+/**
+ * Clase de Personalización para cuando una petición llega sin token
+ * o con un token inválido, se devuelve un error 401 con un mensaje en formato Problem Detail.
+ */
 public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
     private final ObjectMapper objectMapper;

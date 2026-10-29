@@ -36,6 +36,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static final URI INTERNAL_ERROR = URI.create("urn:tvmaze:problem:internal-error");
     private static final URI VALIDATION_ERROR = URI.create("urn:tvmaze:problem:validation-error");
     private static final URI INVALID_CREDENTIALS = URI.create("urn:tvmaze:problem:invalid-credentials");
+    private static final URI TIME_OUT_CODE = URI.create("urn:tvmaze:problem:upstream-timeout");
 
     @ExceptionHandler(InvalidSortFieldException.class)
     public ProblemDetail handleInvalidSortField(InvalidSortFieldException ex) {
@@ -178,5 +179,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         pd.setType(ApiConstants.FORBIDDEN_TYPE);
         pd.setTitle(ApiConstants.FORBIDDEN_TITLE);
         return pd;
+    }
+
+    @ExceptionHandler(TvMazeTimeoutException.class)
+    public ResponseEntity<ProblemDetail> handleTvMazeTimeoutException(TvMazeTimeoutException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.GATEWAY_TIMEOUT, ex.getMessage());
+        problemDetail.setType(TIME_OUT_CODE);
+        problemDetail.setTitle("Timeout en servicio externo");
+        return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT).body(problemDetail);
     }
 }

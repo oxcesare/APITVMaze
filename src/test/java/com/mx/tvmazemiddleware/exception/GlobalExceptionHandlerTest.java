@@ -56,4 +56,14 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.type").value("urn:tvmaze:problem:rate-limited"));
     }
+
+    @Test
+    void timeoutTieneTypePropioY504() throws Exception {
+        when(tvMazeService.getShowById(1L))
+                .thenThrow(new TvMazeTimeoutException("Timeout al conectar con TVMaze", new RuntimeException()));
+
+        mockMvc.perform(get(ApiConstants.V1 + "/shows/1"))
+                .andExpect(status().isGatewayTimeout()) // HTTP 504
+                .andExpect(jsonPath("$.type").value("urn:tvmaze:problem:upstream-timeout"));
+    }
 }
