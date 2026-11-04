@@ -5,11 +5,9 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.retry.annotation.EnableRetry;
 import org.springframework.web.client.RestClient;
 
 @Configuration
-@EnableRetry
 @EnableConfigurationProperties(TvMazeClientProperties.class)
 public class RestClientConfig {
 

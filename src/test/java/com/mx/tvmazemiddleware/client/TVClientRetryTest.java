@@ -4,19 +4,26 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.github.tomakehurst.wiremock.stubbing.Scenario;
+import io.github.resilience4j.springboot3.retry.autoconfigure.RetryAutoConfiguration;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@SpringBootTest(classes = {TVClient.class,RestClientConfig.class})
+@SpringBootTest(classes = {TVClient.class, RestClientConfig.class, ResilienceConfig.class})
+@ImportAutoConfiguration({AopAutoConfiguration.class, RetryAutoConfiguration.class})
 public class TVClientRetryTest {
 
     private static WireMockServer wireMockServer;
@@ -47,6 +54,16 @@ public class TVClientRetryTest {
         registry.add("app.tvmaze.base-url", wireMockServer::baseUrl);
         registry.add("app.tvmaze.read-timeout", () -> "300ms");
         registry.add("app.tvmaze.connect-timeout", () -> "300ms");
+        registry.add("resilience4j.retry.instances.tvmaze.max-attempts", () -> "2");
+        registry.add("resilience4j.retry.instances.tvmaze.retry-exceptions[0]",
+                () -> "com.mx.tvmazemiddleware.exception.TvMazeTimeoutException");
+        registry.add("resilience4j.retry.instances.tvmaze.retry-exceptions[1]",
+                () -> "com.mx.tvmazemiddleware.exception.TvMazeUnavailableException");
+        registry.add("resilience4j.retry.instances.tvmaze.ignore-exceptions[0]",
+                () -> "com.mx.tvmazemiddleware.exception.TvMazeClientErrorException");
+        registry.add("tvmaze.retry.initial-interval", () -> "10ms");
+        registry.add("tvmaze.retry.multiplier", () -> "2.0");
+        registry.add("tvmaze.retry.jitter", () -> "0.0");
     }
 
     @Test
@@ -155,5 +172,86 @@ public class TVClientRetryTest {
         );
 
         wireMockServer.verify(1, getRequestedFor(urlEqualTo("/shows/999")));
+    }
+
+    @Test
+    void agotaIntentos() {
+
+        String scenarioName = "Exhausted Retries Scenario";
+
+        wireMockServer.stubFor(get(urlEqualTo("/shows/1"))
+                .inScenario(scenarioName)
+                .whenScenarioStateIs(Scenario.STARTED)
+                .willReturn(aResponse()
+                        .withStatus(503)
+                        .withHeader("Content-Type", "application/json"))
+                .willSetStateTo("First Attempt Failed"));
+
+        wireMockServer.stubFor(get(urlEqualTo("/shows/1"))
+                .inScenario(scenarioName)
+                .whenScenarioStateIs("First Attempt Failed")
+                .willReturn(aResponse()
+                        .withStatus(503)
+                        .withHeader("Content-Type", "application/json"))
+                .willSetStateTo("Second Attempt Failed"));
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                com.mx.tvmazemiddleware.exception.TvMazeUnavailableException.class,
+                () -> tvClient.getShowById(1L)
+        );
+        wireMockServer.verify(2, getRequestedFor(urlEqualTo("/shows/1")));
+    }
+
+    @Test
+    void noReintentaEn429() {
+
+        wireMockServer.stubFor(get(urlEqualTo("/shows/999"))
+                .willReturn(aResponse()
+                        .withStatus(429)
+                        .withHeader("Content-Type", "application/json")));
+
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                com.mx.tvmazemiddleware.exception.TvMazeRateLimitException.class,
+                () -> tvClient.getShowById(999L)
+        );
+
+        wireMockServer.verify(1, getRequestedFor(urlEqualTo("/shows/999")));
+    }
+
+
+    @ParameterizedTest
+    @ValueSource(ints = {400, 401, 403})
+    void noReintentaEnOtros4xx(int status) {
+        wireMockServer.stubFor(get(urlEqualTo("/shows/1"))
+                .willReturn(aResponse()
+                        .withStatus(status)
+                        .withHeader("Content-Type", "application/json")));
+
+        assertThatThrownBy(() -> tvClient.getShowById(1L))
+                .isExactlyInstanceOf(com.mx.tvmazemiddleware.exception.TvMazeClientErrorException.class)
+                .hasMessageContaining(String.valueOf(status));
+
+        wireMockServer.verify(1, getRequestedFor(urlEqualTo("/shows/1")));
+    }
+
+    @Test
+    void latenciaTotalAcotada() {
+        wireMockServer.stubFor(get(urlEqualTo("/shows/1"))
+                .willReturn(aResponse()
+                        .withFixedDelay(5000)
+                        .withHeader("Content-Type", "application/json")));
+
+        long inicio = System.currentTimeMillis();
+
+
+        assertThatThrownBy(() -> tvClient.getShowById(1L))
+                .isInstanceOf(com.mx.tvmazemiddleware.exception.TvMazeTimeoutException.class);
+
+        long duracion = System.currentTimeMillis() - inicio;
+
+        assertThat(duracion).isLessThan(3000);
+
+        wireMockServer.verify(2, getRequestedFor(urlEqualTo("/shows/1")));
     }
 }

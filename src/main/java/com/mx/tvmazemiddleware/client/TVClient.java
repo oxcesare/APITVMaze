@@ -4,8 +4,7 @@ import com.mx.tvmazemiddleware.dto.EpisodeDetailResponse;
 import com.mx.tvmazemiddleware.dto.ShowDetailResponse;
 import com.mx.tvmazemiddleware.dto.ShowResponse;
 import com.mx.tvmazemiddleware.exception.*;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -56,11 +55,7 @@ public class TVClient {
         return episodeDetailResponse;
     }
 
-    @Retryable(retryFor = {
-            TvMazeTimeoutException.class,
-            TvMazeUnavailableException.class
-    }, maxAttempts = 2,
-            backoff = @Backoff(delay = 0))
+    @Retry(name = "tvmaze")
     public ShowDetailResponse getShowById(Long showId) {
 
         ShowDetailResponse showDetailResponse = null;
@@ -76,6 +71,10 @@ public class TVClient {
             }
             if (ex.getStatusCode().value() == 404) {
                 throw new TvNotShowException(String.valueOf(showId));
+            }
+            if (ex.getStatusCode().is4xxClientError()) {
+                throw new TvMazeClientErrorException(
+                        "TVMaze rechazó la solicitud con HTTP " + ex.getStatusCode().value(), ex);
             }
             throw new TvMazeUnavailableException(
                     "TVMaze respondió con un error HTTP " + ex.getStatusCode().value(), ex);

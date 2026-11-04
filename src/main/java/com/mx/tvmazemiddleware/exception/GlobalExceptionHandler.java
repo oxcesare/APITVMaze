@@ -183,7 +183,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(TvMazeTimeoutException.class)
     public ResponseEntity<ProblemDetail> handleTvMazeTimeoutException(TvMazeTimeoutException ex) {
-        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.GATEWAY_TIMEOUT, ex.getMessage());
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.GATEWAY_TIMEOUT, "El servicio externo no respondió a tiempo");
         problemDetail.setType(TIME_OUT_CODE);
         problemDetail.setTitle("Timeout en servicio externo");
         return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT).body(problemDetail);
