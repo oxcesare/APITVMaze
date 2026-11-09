@@ -4,12 +4,20 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.github.tomakehurst.wiremock.stubbing.Scenario;
+import com.mx.tvmazemiddleware.exception.TvMazeClientErrorException;
+import com.mx.tvmazemiddleware.exception.TvMazeRateLimitException;
+import com.mx.tvmazemiddleware.exception.TvMazeTimeoutException;
+import com.mx.tvmazemiddleware.exception.TvMazeUnavailableException;
+import com.mx.tvmazemiddleware.exception.TvNotShowException;
+import com.mx.tvmazemiddleware.exception.TvShowSearchEmptyException;
 import io.github.resilience4j.springboot3.retry.autoconfigure.RetryAutoConfiguration;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
@@ -17,6 +25,9 @@ import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+
+import java.util.function.Function;
+import java.util.stream.Stream;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -66,11 +77,13 @@ public class TVClientRetryTest {
         registry.add("tvmaze.retry.jitter", () -> "0.0");
     }
 
-    @Test
-    void reintentaTrasTimeoutYTerminaBien() {
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("metodosTvMaze")
+    void reintentaTrasTimeoutYTerminaBien(String nombre, String url, String body,
+                                         Function<TVClient, Long> invocar) {
         String scenarioName = "Timeout Retry Scenario";
 
-        wireMockServer.stubFor(get(urlEqualTo("/shows/1"))
+        wireMockServer.stubFor(get(urlEqualTo(url))
                 .inScenario(scenarioName)
                 .whenScenarioStateIs(Scenario.STARTED)
                 .willReturn(aResponse()
@@ -79,30 +92,24 @@ public class TVClientRetryTest {
                         .withBody("{}"))
                 .willSetStateTo("First Attempt Failed"));
 
-        wireMockServer.stubFor(get(urlEqualTo("/shows/1"))
+        wireMockServer.stubFor(get(urlEqualTo(url))
                 .inScenario(scenarioName)
                 .whenScenarioStateIs("First Attempt Failed")
                 .willReturn(aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
-                        .withBody("{\"id\": 1, \"name\": \"Under the Dome\"}")));
+                        .withBody(body)));
 
-
-        var response = tvClient.getShowById(1L);
-
-        assertThat(response).isNotNull();
-        assertThat(response.id()).isEqualTo(1L);
-
-        wireMockServer.verify(2, getRequestedFor(urlEqualTo("/shows/1")));
+        assertThat(invocar.apply(tvClient)).isEqualTo(1L);
+        wireMockServer.verify(2, getRequestedFor(urlEqualTo(url)));
     }
 
-    @Test
-    void reintentaTras503() {
-
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("metodosTvMaze")
+    void reintentaTras503(String nombre, String url, String body, Function<TVClient, Long> invocar) {
         String scenarioName = "HTTP 503 Retry Scenario";
 
-
-        wireMockServer.stubFor(get(urlEqualTo("/shows/1"))
+        wireMockServer.stubFor(get(urlEqualTo(url))
                 .inScenario(scenarioName)
                 .whenScenarioStateIs(Scenario.STARTED)
                 .willReturn(aResponse()
@@ -111,23 +118,61 @@ public class TVClientRetryTest {
                 .willSetStateTo("First Attempt Failed"));
 
 
-        wireMockServer.stubFor(get(urlEqualTo("/shows/1"))
+        wireMockServer.stubFor(get(urlEqualTo(url))
                 .inScenario(scenarioName)
                 .whenScenarioStateIs("First Attempt Failed")
                 .willReturn(aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
-                        .withBody("{\"id\": 1, \"name\": \"Under the Dome\"}")));
+                        .withBody(body)));
 
+        assertThat(invocar.apply(tvClient)).isEqualTo(1L);
+        wireMockServer.verify(2, getRequestedFor(urlEqualTo(url)));
+    }
 
-        var response = tvClient.getShowById(1L);
+    private static Stream<Arguments> metodosTvMaze() {
+        return Stream.of(
+                Arguments.of("getShowById", "/shows/1", "{\"id\": 1, \"name\": \"Under the Dome\"}",
+                        (Function<TVClient, Long>) client -> client.getShowById(1L).id()),
+                Arguments.of("getEpisodeById", "/episodes/1", "{\"id\": 1, \"name\": \"Pilot\"}",
+                        (Function<TVClient, Long>) client -> client.getEpisodeById(1L).id()),
+                Arguments.of("searchShows", "/search/shows?q=dome",
+                        "[{\"show\":{\"id\": 1, \"name\": \"Under the Dome\"}}]",
+                        (Function<TVClient, Long>) client -> client.searchShows("dome").get(0).getId())
+        );
+    }
 
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("metodosTvMaze")
+    void agotaIntentosYPropagaTimeout(String nombre, String url, String body,
+                                       Function<TVClient, ?> invocar) {
+        wireMockServer.stubFor(get(urlEqualTo(url))
+                .willReturn(aResponse().withFixedDelay(1_000)));
 
-        assertThat(response).isNotNull();
-        assertThat(response.id()).isEqualTo(1L);
+        assertThatThrownBy(() -> invocar.apply(tvClient))
+                .isExactlyInstanceOf(TvMazeTimeoutException.class)
+                .isNotInstanceOf(TvMazeUnavailableException.class);
+        wireMockServer.verify(2, getRequestedFor(urlEqualTo(url)));
+    }
 
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("metodosTvMaze")
+    void clasifica4xxSinReintentar(String nombre, String url, String body,
+                                    Function<TVClient, ?> invocar) {
+        int[] statuses = {400, 404, 429};
+        for (int status : statuses) {
+            wireMockServer.resetAll();
+            wireMockServer.stubFor(get(urlEqualTo(url)).willReturn(aResponse().withStatus(status)));
 
-        wireMockServer.verify(2, getRequestedFor(urlEqualTo("/shows/1")));
+            Class<? extends RuntimeException> expected = switch (status) {
+                case 400 -> TvMazeClientErrorException.class;
+                case 404 -> nombre.equals("searchShows") ? TvShowSearchEmptyException.class : TvNotShowException.class;
+                case 429 -> TvMazeRateLimitException.class;
+                default -> throw new IllegalStateException("Estado inesperado: " + status);
+            };
+            assertThatThrownBy(() -> invocar.apply(tvClient)).isExactlyInstanceOf(expected);
+            wireMockServer.verify(1, getRequestedFor(urlEqualTo(url)));
+        }
     }
 
     @Test
@@ -172,34 +217,6 @@ public class TVClientRetryTest {
         );
 
         wireMockServer.verify(1, getRequestedFor(urlEqualTo("/shows/999")));
-    }
-
-    @Test
-    void agotaIntentos() {
-
-        String scenarioName = "Exhausted Retries Scenario";
-
-        wireMockServer.stubFor(get(urlEqualTo("/shows/1"))
-                .inScenario(scenarioName)
-                .whenScenarioStateIs(Scenario.STARTED)
-                .willReturn(aResponse()
-                        .withStatus(503)
-                        .withHeader("Content-Type", "application/json"))
-                .willSetStateTo("First Attempt Failed"));
-
-        wireMockServer.stubFor(get(urlEqualTo("/shows/1"))
-                .inScenario(scenarioName)
-                .whenScenarioStateIs("First Attempt Failed")
-                .willReturn(aResponse()
-                        .withStatus(503)
-                        .withHeader("Content-Type", "application/json"))
-                .willSetStateTo("Second Attempt Failed"));
-
-        org.junit.jupiter.api.Assertions.assertThrows(
-                com.mx.tvmazemiddleware.exception.TvMazeUnavailableException.class,
-                () -> tvClient.getShowById(1L)
-        );
-        wireMockServer.verify(2, getRequestedFor(urlEqualTo("/shows/1")));
     }
 
     @Test

@@ -1,7 +1,5 @@
 package com.mx.tvmazemiddleware.client;
 
-import com.mx.tvmazemiddleware.security.RetryIntervals;
-import com.mx.tvmazemiddleware.security.TvMazeRetryProperties;
 import io.github.resilience4j.core.IntervalFunction;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -18,8 +16,8 @@ class RetryIntervalFunctionTest {
 
     private static final int SAMPLES = 1_000;
 
-    private final TvMazeRetryProperties properties =
-            new TvMazeRetryProperties(Duration.ofMillis(100), 2.0, 0.5);
+    private final ResilienceConfig.TvMazeRetryProperties properties =
+            new ResilienceConfig.TvMazeRetryProperties(Duration.ofMillis(100), 2.0, 0.5);
 
     @ParameterizedTest(name = "intento {0}: entre {1} y {2} ms")
     @CsvSource({

@@ -1,4 +1,4 @@
-package com.mx.tvmazemiddleware.security;
+package com.mx.tvmazemiddleware.client;
 
 import io.github.resilience4j.core.IntervalFunction;
 
@@ -6,7 +6,7 @@ public final class RetryIntervals {
 
     private RetryIntervals() {}
 
-    public static IntervalFunction exponentialWithJitter(TvMazeRetryProperties properties) {
+    public static IntervalFunction exponentialWithJitter(ResilienceConfig.TvMazeRetryProperties properties) {
         if (properties.jitter() < 0.0 || properties.jitter() > 1.0) {
             throw new IllegalArgumentException("El factor de jitter debe estar entre 0.0 y 1.0");
         }

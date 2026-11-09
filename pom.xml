@@ -107,6 +107,14 @@
             <version>2.2.0</version> <!-- Versión totalmente compatible y estable con Spring Boot 3.3.x -->
         </dependency>
 
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <version>4.2.2</version>
+            <scope>test</scope>
+        </dependency>
+
+
         <!-- Obligatorio: Habilita el procesamiento de las anotaciones (@CircuitBreaker, etc.) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

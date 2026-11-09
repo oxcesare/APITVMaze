@@ -67,21 +67,15 @@ class RetryConfigurationTest {
     @Test
     void elContratoDeLaConfiguracionReal() {
         runnerReal.run(context -> {
-            assertThat(context).hasNotFailed();
-            RetryRegistry registry = context.getBean(RetryRegistry.class);
-            assertThat(registry.getAllRetries()).extracting(Retry::getName).contains("tvmaze");
+            RetryConfig retryConfig = config(context);
 
-            RetryConfig retryConfig = registry.retry("tvmaze").getRetryConfig();
+            assertThat(context.getEnvironment().getProperty("tvmaze.retry.initial-interval")).isEqualTo("200ms");
+            assertThat(context.getEnvironment().getProperty("tvmaze.retry.multiplier")).isEqualTo("2.0");
+            assertThat(context.getEnvironment().getProperty("tvmaze.retry.jitter")).isEqualTo("0.5");
+            assertThat(retryConfig.getMaxAttempts()).isEqualTo(4);
 
-            // Valida los intentos máximos reales
-            assertThat(retryConfig.getMaxAttempts()).isNotEqualTo(3); // Distinto al default
-
-            // Valida que el intervalo inicial del archivo real coincida con tu configuración real
-            var intervalFunction = retryConfig.getIntervalFunction();
-            long primerIntervalo = intervalFunction.apply(1);
-
-            // Ajustamos el rango al valor real obtenido (119L)
-            assertThat(primerIntervalo).isBetween(100L, 300L);
+            // 200 ms con un jitter de 0.5 da un intervalo de 100 a 300 ms.
+            assertThat(retryConfig.getIntervalFunction().apply(1)).isBetween(100L, 300L);
         });
     }
 
