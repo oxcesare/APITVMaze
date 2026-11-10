@@ -1,6 +1,7 @@
 package com.mx.tvmazemiddleware.exception;
 
 
+import com.mx.tvmazemiddleware.util.ApiConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -26,14 +27,26 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     private static final URI SHOW_NOT_FOUND = URI.create("urn:tvmaze:problem:show-not-found");
-    private static final URI RATING_SHOW_REFERENCE_NOT_FOUND =
-            URI.create("urn:tvmaze:problem:rating-show-reference-not-found");
+    private static final URI RATING_SHOW_NOT_REGISTERED =
+            URI.create("urn:tvmaze:problem:rating-show-not-registered");
     private static final URI RATING_ALREADY_EXISTS = URI.create("urn:tvmaze:problem:rating-already-exists");
     private static final URI SEARCH_NO_RESULTS = URI.create("urn:tvmaze:problem:search-no-results");
     private static final URI UPSTREAM_UNAVAILABLE = URI.create("urn:tvmaze:problem:upstream-unavailable");
     private static final URI RATE_LIMITED = URI.create("urn:tvmaze:problem:rate-limited");
     private static final URI INTERNAL_ERROR = URI.create("urn:tvmaze:problem:internal-error");
     private static final URI VALIDATION_ERROR = URI.create("urn:tvmaze:problem:validation-error");
+    private static final URI INVALID_CREDENTIALS = URI.create("urn:tvmaze:problem:invalid-credentials");
+    private static final URI TIME_OUT_CODE = URI.create("urn:tvmaze:problem:upstream-timeout");
+
+    @ExceptionHandler(InvalidSortFieldException.class)
+    public ProblemDetail handleInvalidSortField(InvalidSortFieldException ex) {
+        log.warn("Criterio de ordenamiento no permitido: {}", ex.field());
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        pd.setType(VALIDATION_ERROR);
+        pd.setTitle("Error de validación");
+        pd.setProperty("field", ex.field());
+        return pd;
+    }
 
     @ExceptionHandler(TvNotShowException.class)
     public ProblemDetail handleNotFound(TvNotShowException ex) {
@@ -45,11 +58,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(RatingShowReferenceNotFoundException.class)
     public ProblemDetail handleRatingShowReferenceNotFound(RatingShowReferenceNotFoundException ex) {
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(
-                HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
-        pd.setType(RATING_SHOW_REFERENCE_NOT_FOUND);
-        pd.setTitle("Show referenciado no encontrado");
-        pd.setProperty("showId", ex.showId());
+        return showNotRegisteredProblem(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), ex.showId());
+    }
+
+    @ExceptionHandler(RatingShowNotFoundException.class)
+    public ProblemDetail handleRatingShowNotFound(RatingShowNotFoundException ex) {
+        return showNotRegisteredProblem(HttpStatus.NOT_FOUND, ex.getMessage(), ex.showId());
+    }
+
+    private ProblemDetail showNotRegisteredProblem(HttpStatus status, String detail, Long showId) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(status, detail);
+        pd.setType(RATING_SHOW_NOT_REGISTERED);
+        pd.setTitle("Show no registrado");
+        pd.setProperty("showId", showId);
         return pd;
     }
 
@@ -60,7 +81,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         pd.setTitle("La calificación ya existe");
         pd.setProperty("showId", ex.showId());
         pd.setProperty("userId", ex.userId());
-        pd.setProperty("ratingId", ex.ratingId());
+        if (ex.ratingId() != null) {
+            pd.setProperty("ratingId", ex.ratingId());
+        }
         return pd;
     }
 
@@ -139,5 +162,31 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             pd.setType(URI.create("urn:tvmaze:problem:" + slug));
         }
         return super.handleExceptionInternal(ex, body, headers, statusCode, request);
+    }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ProblemDetail handleInvalidCredentials(InvalidCredentialsException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Las credenciales proporcionadas no son válidas.");
+        pd.setType(INVALID_CREDENTIALS);
+        pd.setTitle("Credenciales inválidas");
+        return pd;
+    }
+
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ProblemDetail handleAccessDenied(org.springframework.security.access.AccessDeniedException ex) {
+        log.warn("Acceso denegado: {}", ex.getMessage());
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ApiConstants.FORBIDDEN_DETAIL);
+        pd.setType(ApiConstants.FORBIDDEN_TYPE);
+        pd.setTitle(ApiConstants.FORBIDDEN_TITLE);
+        return pd;
+    }
+
+    @ExceptionHandler(TvMazeTimeoutException.class)
+    public ResponseEntity<ProblemDetail> handleTvMazeTimeoutException(TvMazeTimeoutException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.GATEWAY_TIMEOUT, "El servicio externo no respondió a tiempo");
+        problemDetail.setType(TIME_OUT_CODE);
+        problemDetail.setTitle("Timeout en servicio externo");
+        return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT).body(problemDetail);
     }
 }

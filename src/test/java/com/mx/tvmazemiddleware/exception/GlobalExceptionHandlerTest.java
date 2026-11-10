@@ -1,5 +1,6 @@
 package com.mx.tvmazemiddleware.exception;
 
+import com.mx.tvmazemiddleware.client.TVClient;
 import com.mx.tvmazemiddleware.controller.TVMazeController;
 import com.mx.tvmazemiddleware.service.TVMazeService;
 import com.mx.tvmazemiddleware.util.ApiConstants;
@@ -7,18 +8,28 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(TVMazeController.class)
+@WithMockUser
 class GlobalExceptionHandlerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @MockBean
+    private JwtDecoder jwtDecoder;
+
+    @MockBean
+    private TVClient tvClient;
 
     @MockBean
     private TVMazeService tvMazeService;
@@ -49,5 +60,60 @@ class GlobalExceptionHandlerTest {
         mockMvc.perform(get(ApiConstants.V1 + "/shows/1"))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.type").value("urn:tvmaze:problem:rate-limited"));
+    }
+
+    @Test
+    void timeoutTieneTypePropioY504() throws Exception {
+        when(tvMazeService.getShowById(1L))
+                .thenThrow(new TvMazeTimeoutException("Timeout al conectar con TVMaze", new RuntimeException()));
+
+        mockMvc.perform(get(ApiConstants.V1 + "/shows/1"))
+                .andExpect(status().isGatewayTimeout()) // HTTP 504
+                .andExpect(jsonPath("$.type").value("urn:tvmaze:problem:upstream-timeout"));
+    }
+
+    @Test
+    void handlerTimeoutDevuelve504() throws Exception {
+
+        java.net.SocketTimeoutException causaOriginal = new java.net.SocketTimeoutException("Read timed out");
+
+        given(tvMazeService.getShowById(1L))
+                .willThrow(new TvMazeTimeoutException("Timeout de conexión con TVMaze", causaOriginal));
+
+        mockMvc.perform(get(ApiConstants.V1 + "/shows/1"))
+                .andExpect(status().isGatewayTimeout())
+                .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+                .andExpect(jsonPath("$.type").value("urn:tvmaze:problem:upstream-timeout"))
+                .andExpect(jsonPath("$.title").value("Timeout en servicio externo"))
+                .andExpect(jsonPath("$.status").value(504));
+    }
+
+    @Test
+    void respuestaNoFiltraInternos() throws Exception {
+
+        String url = "https://api.tvmaze.com/shows/1";
+
+        java.net.SocketTimeoutException causaOriginal =
+                new java.net.SocketTimeoutException("Read timed out calling " + url);
+
+        given(tvMazeService.getShowById(1L))
+                .willThrow(new TvMazeTimeoutException("Timeout al consultar " + url, causaOriginal));
+
+        String body = mockMvc.perform(get(ApiConstants.V1 + "/shows/1"))
+                .andExpect(status().isGatewayTimeout())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(body)
+                .doesNotContain("api.tvmaze.com")
+                .doesNotContain("tvmaze.com")
+                .doesNotContain(url)
+                .doesNotContain("http://")
+                .doesNotContain("https://")
+                .doesNotContain("SocketTimeoutException")
+                .doesNotContain("java.net")
+                .doesNotContain("com.mx.tvmazemiddleware")
+                .doesNotContain("stackTrace")
+                .doesNotContain("\tat ")
+                .doesNotContain("Read timed out");
     }
 }

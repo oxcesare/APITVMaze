@@ -48,11 +48,15 @@ mvn clean install
 desde la Terminal:
 
 export MONGODB_URI="mongodb+srv://usuario:password@cluster.mongodb.net/tvmaze?retryWrites=true&w=majority"
+export ADMIN_USERNAME="admin"
+export ADMIN_PASSWORD="una-clave-segura"
 mvn spring-boot:run
 
 3. Accede a la API en http://localhost:8080
 
 4. La aplicación ya esta conectada con la base de datos de MongoDB Atlas y no hay restrcciones de IP
+
+Al iniciar, la aplicación crea el usuario administrador únicamente si no existe. Configura `ADMIN_USERNAME` y `ADMIN_PASSWORD`; la contraseña se almacena con BCrypt.
 
 ### Endpoints 
 
@@ -87,10 +91,10 @@ Los errores se devuelven como `ProblemDetail` (RFC 7807) con un `type` estable d
 |------|------|-----------|
 | 200 | - | Consultas GET exitosas |
 | 201 | - | Rating creado (`POST /ratings`) |
-| 400 | `validation-error` | Body inválido, vacío, mal formado o con tipos incorrectos |
-| 404 | `show-not-found` / `search-no-results` | Show inexistente o búsqueda sin resultados |
+| 400 | `validation-error` | Body inválido, vacío, mal formado, con tipos incorrectos o `sort` no permitido. Trae `errors` (lista) en validación del body, o `field` en `sort` no permitido |
+| 404 | `show-not-found` / `search-no-results` / `rating-show-not-registered` | Show inexistente, búsqueda sin resultados, o show sin registrar al listar ratings |
 | 409 | `rating-already-exists` | El usuario ya calificó ese show |
-| 422 | `rating-show-reference-not-found` | El show del rating no existe en nuestra base de datos |
+| 422 | `rating-show-not-registered` | El show del rating no existe en nuestra base de datos |
 | 429 | `rate-limited` | TVMaze limitó las peticiones |
 | 500 | `internal-error` | Error inesperado |
 | 503 | `upstream-unavailable` | TVMaze no está disponible |
@@ -100,4 +104,5 @@ Los errores se devuelven como `ProblemDetail` (RFC 7807) con un `type` estable d
 - **201 en `POST /ratings`**: se crea un recurso nuevo; la respuesta incluye `ratingId`.
 - **400 vs 422 vs 409**: 400 se reserva para requests mal formados o que no pasan validación. 422 indica que la request es válida sintácticamente pero referencia un show que no existe en nuestra base. 409 indica que la request es válida pero choca con el estado actual (ya existe un rating del mismo `userId` para el `showId`).
 - **Rating duplicado**: antes se respondía con éxito HTTP y `status: "error"` en el body. Ahora se lanza `RatingAlreadyExistsException` y se responde 409 con `showId`, `userId` y el `ratingId` existente, para que el cliente pueda distinguirlo sin inspeccionar el body de un 201.
+- **409 sin `ratingId`**: si el duplicado ocurre en una carrera y el reintento de guardado también choca, el id del rating existente no se conoce. En ese caso el campo `ratingId` se omite del body (no viene como `null`); `showId` y `userId` siempre están presentes.
 - **Errores de TVMaze**: 429 y 503 se propagan como tales; el detalle interno no se expone al cliente.
