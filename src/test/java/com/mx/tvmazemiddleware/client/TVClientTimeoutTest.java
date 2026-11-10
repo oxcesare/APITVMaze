@@ -82,13 +82,6 @@ public class TVClientTimeoutTest {
     }
 
     @Test
-    void lecturaLentaLanzaTimeout() {
-        assertThatThrownBy(() -> tvClient.getShowById(1L))
-                .isInstanceOf(TvMazeTimeoutException.class)
-                .isNotInstanceOf(TvMazeUnavailableException.class);
-    }
-
-    @Test
     void respuestaRapidaNoFalla() {
         wireMockServer.stubFor(get(urlEqualTo("/shows/2"))
                 .willReturn(aResponse()

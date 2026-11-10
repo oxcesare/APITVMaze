@@ -141,6 +141,33 @@ class TVClientTest {
     }
 
     @Test
+    void propagaLaMismaExcepcionCuandoHayUnErrorInterno() {
+        IllegalStateException error = new IllegalStateException("Error interno");
+        when(restClient.get()).thenThrow(error);
+
+        assertThatThrownBy(() -> tvClient.getShowById(1L)).isSameAs(error);
+        assertThatThrownBy(() -> tvClient.getEpisodeById(1L)).isSameAs(error);
+        assertThatThrownBy(() -> tvClient.searchShows("girls")).isSameAs(error);
+    }
+
+    @Test
+    void lanzaTvMazeUnavailableCuandoLaRespuestaNoSePuedeConvertir() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://localhost");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        TVClient client = new TVClient(builder.build());
+
+        server.expect(requestTo("http://localhost/shows/1"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("{invalid json", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.getShowById(1L))
+                .isInstanceOf(TvMazeUnavailableException.class)
+                .hasCauseInstanceOf(RestClientException.class);
+
+        server.verify();
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void listaShowTvMazeDisponible() {
         ShowResponse show = new ShowResponse();

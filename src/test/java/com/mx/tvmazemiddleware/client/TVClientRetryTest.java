@@ -18,7 +18,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration;
@@ -27,6 +26,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 import java.util.function.Function;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
@@ -155,24 +155,30 @@ public class TVClientRetryTest {
         wireMockServer.verify(2, getRequestedFor(urlEqualTo(url)));
     }
 
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("metodosTvMaze")
-    void clasifica4xxSinReintentar(String nombre, String url, String body,
-                                    Function<TVClient, ?> invocar) {
-        int[] statuses = {400, 404, 429};
-        for (int status : statuses) {
-            wireMockServer.resetAll();
-            wireMockServer.stubFor(get(urlEqualTo(url)).willReturn(aResponse().withStatus(status)));
+    @ParameterizedTest(name = "{0} HTTP {3}")
+    @MethodSource("metodosYEstados4xx")
+    void clasifica4xxSinReintentar(String nombre, String url, Function<TVClient, ?> invocar, int status) {
+        wireMockServer.stubFor(get(urlEqualTo(url)).willReturn(aResponse().withStatus(status)));
 
-            Class<? extends RuntimeException> expected = switch (status) {
-                case 400 -> TvMazeClientErrorException.class;
-                case 404 -> nombre.equals("searchShows") ? TvShowSearchEmptyException.class : TvNotShowException.class;
-                case 429 -> TvMazeRateLimitException.class;
-                default -> throw new IllegalStateException("Estado inesperado: " + status);
-            };
-            assertThatThrownBy(() -> invocar.apply(tvClient)).isExactlyInstanceOf(expected);
-            wireMockServer.verify(1, getRequestedFor(urlEqualTo(url)));
+        Class<? extends RuntimeException> expected = switch (status) {
+            case 400, 401, 403 -> TvMazeClientErrorException.class;
+            case 404 -> nombre.equals("searchShows") ? TvShowSearchEmptyException.class : TvNotShowException.class;
+            case 429 -> TvMazeRateLimitException.class;
+            default -> throw new IllegalStateException("Estado inesperado: " + status);
+        };
+        var assertion = assertThatThrownBy(() -> invocar.apply(tvClient)).isExactlyInstanceOf(expected);
+        if (expected == TvMazeClientErrorException.class) {
+            assertion.hasMessageContaining(String.valueOf(status));
         }
+        wireMockServer.verify(1, getRequestedFor(urlEqualTo(url)));
+    }
+
+    private static Stream<Arguments> metodosYEstados4xx() {
+        return metodosTvMaze().flatMap(method -> {
+            Object[] args = method.get();
+            return IntStream.of(400, 401, 403, 404, 429)
+                    .mapToObj(status -> Arguments.of(args[0], args[1], args[3], status));
+        });
     }
 
     @Test
@@ -200,56 +206,6 @@ public class TVClientRetryTest {
                 () -> tvClient.getShowById(1L)
         );
         wireMockServer.verify(2, getRequestedFor(urlEqualTo("/shows/1")));
-    }
-
-    @Test
-    void noReintentaEn404() {
-
-        wireMockServer.stubFor(get(urlEqualTo("/shows/999"))
-                .willReturn(aResponse()
-                        .withStatus(404)
-                        .withHeader("Content-Type", "application/json")));
-
-
-        org.junit.jupiter.api.Assertions.assertThrows(
-                com.mx.tvmazemiddleware.exception.TvNotShowException.class,
-                () -> tvClient.getShowById(999L)
-        );
-
-        wireMockServer.verify(1, getRequestedFor(urlEqualTo("/shows/999")));
-    }
-
-    @Test
-    void noReintentaEn429() {
-
-        wireMockServer.stubFor(get(urlEqualTo("/shows/999"))
-                .willReturn(aResponse()
-                        .withStatus(429)
-                        .withHeader("Content-Type", "application/json")));
-
-
-        org.junit.jupiter.api.Assertions.assertThrows(
-                com.mx.tvmazemiddleware.exception.TvMazeRateLimitException.class,
-                () -> tvClient.getShowById(999L)
-        );
-
-        wireMockServer.verify(1, getRequestedFor(urlEqualTo("/shows/999")));
-    }
-
-
-    @ParameterizedTest
-    @ValueSource(ints = {400, 401, 403})
-    void noReintentaEnOtros4xx(int status) {
-        wireMockServer.stubFor(get(urlEqualTo("/shows/1"))
-                .willReturn(aResponse()
-                        .withStatus(status)
-                        .withHeader("Content-Type", "application/json")));
-
-        assertThatThrownBy(() -> tvClient.getShowById(1L))
-                .isExactlyInstanceOf(com.mx.tvmazemiddleware.exception.TvMazeClientErrorException.class)
-                .hasMessageContaining(String.valueOf(status));
-
-        wireMockServer.verify(1, getRequestedFor(urlEqualTo("/shows/1")));
     }
 
     @Test

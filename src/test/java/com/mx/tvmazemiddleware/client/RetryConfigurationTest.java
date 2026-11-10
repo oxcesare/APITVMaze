@@ -17,6 +17,8 @@ import org.springframework.boot.test.context.ConfigDataApplicationContextInitial
 import org.springframework.boot.test.context.assertj.AssertableApplicationContext;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
+import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -99,13 +101,17 @@ class RetryConfigurationTest {
     void lasAnotacionesApuntanAUnaInstanciaConfigurada() {
         runnerReal.run(context -> {
             RetryRegistry registry = context.getBean(RetryRegistry.class);
-            for (var method : TVClient.class.getDeclaredMethods()) {
+            var annotatedMethods = Arrays.stream(TVClient.class.getDeclaredMethods())
+                    .filter(method -> method.isAnnotationPresent(io.github.resilience4j.retry.annotation.Retry.class))
+                    .toList();
+            assertThat(annotatedMethods).extracting(Method::getName)
+                    .containsExactlyInAnyOrder("getShowById", "searchShows", "getEpisodeById");
+
+            for (var method : annotatedMethods) {
                 var retryAnn = method.getAnnotation(io.github.resilience4j.retry.annotation.Retry.class);
-                if (retryAnn != null) {
-                    assertThat(registry.getAllRetries())
-                            .extracting(Retry::getName)
-                            .contains(retryAnn.name());
-                }
+                assertThat(registry.getAllRetries())
+                        .extracting(Retry::getName)
+                        .contains(retryAnn.name());
             }
         });
     }
@@ -124,9 +130,4 @@ class RetryConfigurationTest {
                 new IllegalStateException()
         );
     }
-
-    private final ApplicationContextRunner archivoReal = new ApplicationContextRunner()
-            .withConfiguration(AutoConfigurations.of(RetryAutoConfiguration.class))
-            .withUserConfiguration(ResilienceConfig.class)
-            .withInitializer(new ConfigDataApplicationContextInitializer());
 }

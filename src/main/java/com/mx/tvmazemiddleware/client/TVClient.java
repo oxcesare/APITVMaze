@@ -8,6 +8,7 @@ import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.net.ConnectException;
@@ -33,7 +34,7 @@ public class TVClient {
                     .uri("/episodes/{id}", episodeId)
                     .retrieve()
                     .body(EpisodeDetailResponse.class);
-        } catch (Exception ex) {
+        } catch (RestClientException ex) {
             throw translateException(ex, () -> new TvNotShowException(String.valueOf(episodeId)),
                     "obtener el episodio con ID " + episodeId);
         }
@@ -47,7 +48,7 @@ public class TVClient {
                     .uri("/shows/{id}", showId)
                     .retrieve()
                     .body(ShowDetailResponse.class);
-        } catch (Exception ex) {
+        } catch (RestClientException ex) {
             throw translateException(ex, () -> new TvNotShowException(String.valueOf(showId)),
                     "obtener el show con ID " + showId);
         }
@@ -63,7 +64,7 @@ public class TVClient {
                     .uri("/search/shows?q={q}", searchQuery)
                     .retrieve()
                     .body(SearchResultItem[].class);
-        } catch (Exception ex) {
+        } catch (RestClientException ex) {
             throw translateException(ex, () -> new TvShowSearchEmptyException(searchQuery),
                     "buscar shows con la consulta " + searchQuery);
         }
@@ -80,7 +81,7 @@ public class TVClient {
     record SearchResultItem(ShowResponse show) {
     }
 
-    private RuntimeException translateException(Exception ex, Supplier<RuntimeException> notFound, String operation) {
+    private RuntimeException translateException(RestClientException ex, Supplier<RuntimeException> notFound, String operation) {
         if (ex instanceof RestClientResponseException responseException) {
             if (responseException.getStatusCode().value() == 429) {
                 return new TvMazeRateLimitException("Se excedió el límite de peticiones", ex);

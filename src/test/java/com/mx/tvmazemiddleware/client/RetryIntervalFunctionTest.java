@@ -1,6 +1,7 @@
 package com.mx.tvmazemiddleware.client;
 
 import io.github.resilience4j.core.IntervalFunction;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -8,9 +9,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import java.time.Duration;
 import java.util.List;
 import java.util.stream.IntStream;
-
-import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
-import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 
 class RetryIntervalFunctionTest {
 
@@ -35,8 +33,8 @@ class RetryIntervalFunctionTest {
                 .toList();
 
 
-        assertThat(muestras)
-                .allSatisfy(ms -> assertThat(ms).isBetween(minimo - 1, maximo + 1));
+        Assertions.assertThat(muestras)
+                .allSatisfy(ms -> Assertions.assertThat(ms).isBetween(minimo - 1, maximo + 1));
     }
 
     @Test
@@ -50,14 +48,29 @@ class RetryIntervalFunctionTest {
 
         long valoresDistintos = muestras.stream().distinct().count();
 
-        assertThat(valoresDistintos).isGreaterThan(10);
+        Assertions.assertThat(valoresDistintos).isGreaterThan(10);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "2.0, -0.1, El factor de jitter debe estar entre 0.0 y 1.0",
+            "2.0,  1.5, El factor de jitter debe estar entre 0.0 y 1.0",
+            "0.5,  0.5, El multiplicador debe ser al menos 1.0"
+    })
+    void configuracionInvalidaDebeLanzarExcepcion(double multiplier, double jitter, String mensaje) {
+        var propiedadesInvalidas = new ResilienceConfig.TvMazeRetryProperties(
+                Duration.ofMillis(100), multiplier, jitter);
+
+        Assertions.assertThatThrownBy(() -> RetryIntervals.exponentialWithJitter(propiedadesInvalidas))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage(mensaje);
     }
 
     @Test
     void intentoInvalidoDebeLanzarExcepcion() {
         IntervalFunction function = RetryIntervals.exponentialWithJitter(properties);
 
-        assertThatThrownBy(() -> function.apply(0))
-                .isInstanceOf(Exception.class);
+        Assertions.assertThatThrownBy(() -> function.apply(0))
+                .isExactlyInstanceOf(IllegalArgumentException.class);
     }
 }

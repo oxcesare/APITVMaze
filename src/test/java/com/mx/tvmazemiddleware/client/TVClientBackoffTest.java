@@ -4,6 +4,7 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.github.tomakehurst.wiremock.stubbing.Scenario;
+import io.github.resilience4j.retry.RetryRegistry;
 import io.github.resilience4j.springboot3.retry.autoconfigure.RetryAutoConfiguration;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -16,7 +17,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,6 +34,9 @@ class TVClientBackoffTest {
 
     @Autowired
     private TVClient tvClient;
+
+    @Autowired
+    private RetryRegistry retryRegistry;
 
     @BeforeAll
     static void setUpWireMock() {
@@ -84,6 +90,10 @@ class TVClientBackoffTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody("{\"id\": 1, \"name\": \"Under the Dome\"}")));
 
+        List<Duration> intervalos = new CopyOnWriteArrayList<>();
+        retryRegistry.retry("tvmaze").getEventPublisher()
+                .onRetry(e -> intervalos.add(e.getWaitInterval()));
+
         var response = tvClient.getShowById(1L);
 
         assertThat(response.id()).isEqualTo(1L);
@@ -99,6 +109,8 @@ class TVClientBackoffTest {
 
         assertThat(espera1).isGreaterThanOrEqualTo(DELAY_INICIAL_MS);
         assertThat(espera2).isGreaterThanOrEqualTo(DELAY_INICIAL_MS * 2);
-        assertThat(espera2).isGreaterThan(espera1);
+
+        assertThat(intervalos).containsExactly(
+                Duration.ofMillis(DELAY_INICIAL_MS), Duration.ofMillis(DELAY_INICIAL_MS * 2));
     }
 }
