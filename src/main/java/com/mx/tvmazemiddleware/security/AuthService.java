@@ -1,11 +1,15 @@
 package com.mx.tvmazemiddleware.security;
 
+import com.mx.tvmazemiddleware.dto.EpisodeDetailResponse;
 import com.mx.tvmazemiddleware.dto.User;
 import com.mx.tvmazemiddleware.exception.InvalidCredentialsException;
+import com.mx.tvmazemiddleware.exception.TvNotShowException;
 import com.mx.tvmazemiddleware.repository.UserRepository;
 import com.mx.tvmazemiddleware.service.TokenService;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
 
 @Service
 public class AuthService {
@@ -35,4 +39,6 @@ public class AuthService {
         }
         return tokenService.issue(user);
     }
+
+
 }

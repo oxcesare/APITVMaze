@@ -39,6 +39,7 @@ public class RatingService {
         this.ratingRepository = ratingRepository;
     }
 
+
     public RatingResponse saveRating(RatingRequest ratingRequest) {
         var show = showRepository.findById(ratingRequest.showId());
 
