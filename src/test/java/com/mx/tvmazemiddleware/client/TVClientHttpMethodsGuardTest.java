@@ -56,20 +56,20 @@ class TVClientHttpMethodsGuardTest {
     @Test
     void elClienteSoloEmiteGet() {
         // 1. Configurar stubs en WireMock para las 3 operaciones de lectura
-        wireMockServer.stubFor(get(urlPathEqualTo("/shows/1"))
+        wireMockServer.stubFor(any(urlPathEqualTo("/shows/1"))
                 .willReturn(aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE)
                         .withBody("{\"id\":1,\"name\":\"Girls\"}")));
 
-        wireMockServer.stubFor(get(urlPathEqualTo("/search/shows"))
+        wireMockServer.stubFor(any(urlPathEqualTo("/search/shows"))
                 .withQueryParam("q", equalTo("girls"))
                 .willReturn(aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE)
                         .withBody("[{\"show\":{\"id\":1,\"name\":\"Girls\"}}]")));
 
-        wireMockServer.stubFor(get(urlPathEqualTo("/episodes/1"))
+        wireMockServer.stubFor(any(urlPathEqualTo("/episodes/1"))
                 .willReturn(aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE)

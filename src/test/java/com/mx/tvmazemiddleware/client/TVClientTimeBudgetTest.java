@@ -1,8 +1,6 @@
 package com.mx.tvmazemiddleware.client;
 
-import io.github.resilience4j.springboot3.retry.autoconfigure.RetryAutoConfiguration;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.context.properties.bind.Binder;
@@ -16,9 +14,7 @@ class TVClientTimeBudgetTest {
 
     // Cargamos el application.properties real de producción de la aplicación
     private final ApplicationContextRunner realRunner = new ApplicationContextRunner()
-            .withInitializer(new ConfigDataApplicationContextInitializer())
-            .withConfiguration(AutoConfigurations.of(RetryAutoConfiguration.class))
-            .withUserConfiguration(ResilienceConfig.class);
+            .withInitializer(new ConfigDataApplicationContextInitializer());
 
     @Test
     void elPeorCasoDeEsperaRespetaElPresupuestoMaximoReal() {
@@ -27,16 +23,20 @@ class TVClientTimeBudgetTest {
             Binder binder = Binder.get(env);
 
             // 1. Leer los parámetros reales desde la configuración (application.properties)
-            int maxAttempts = env.getProperty("resilience4j.retry.instances.tvmaze.max-attempts", Integer.class, 3);
+            int maxAttempts = env.getRequiredProperty("resilience4j.retry.instances.tvmaze.max-attempts", Integer.class);
 
-            // Suponiendo que tus propiedades de timeout de RestClient/TVMaze están definidas en application.properties:
-            // Ej: app.tvmaze.connect-timeout=5s, app.tvmaze.read-timeout=5s
-            Duration connectTimeout = binder.bind("app.tvmaze.connect-timeout", Duration.class).orElse(Duration.ofMillis(1000));
-            Duration readTimeout = binder.bind("app.tvmaze.read-timeout", Duration.class).orElse(Duration.ofMillis(2000));
+            Duration connectTimeout = binder.bind("app.tvmaze.connect-timeout", Duration.class)
+                    .orElseThrow(() -> new IllegalStateException("Falta app.tvmaze.connect-timeout"));
 
-            double initialIntervalMs = binder.bind("tvmaze.retry.initial-interval", Duration.class).orElse(Duration.ofMillis(200)).toMillis();
-            double multiplier = env.getProperty("tvmaze.retry.multiplier", Double.class, 2.0);
-            double jitter = env.getProperty("tvmaze.retry.jitter", Double.class, 0.5);
+            Duration readTimeout = binder.bind("app.tvmaze.read-timeout", Duration.class)
+                    .orElseThrow(() -> new IllegalStateException("Falta app.tvmaze.read-timeout"));
+
+            double initialIntervalMs = binder.bind("tvmaze.retry.initial-interval", Duration.class)
+                    .orElseThrow(() -> new IllegalStateException("Falta tvmaze.retry.initial-interval")).toMillis();
+
+            double multiplier = env.getRequiredProperty("tvmaze.retry.multiplier", Double.class);
+
+            double jitter = env.getRequiredProperty("tvmaze.retry.jitter", Double.class);
 
             // 2. Cálculo determinista de las esperas máximas acumuladas considerando el Jitter al alza:
             // Fórmula: initial × multiplier^(k-1) × (1 + jitter)

@@ -40,7 +40,7 @@ public class RetryLoggingConfig {
                             ? event.getLastThrowable().getClass().getSimpleName()
                             : "UnknownException";
 
-                    log.error("Reintentos agotados de '{}' tras {} intentos por {}",
+                    log.warn("Reintentos agotados de '{}' tras {} intentos por {}",
                             event.getName(),
                             event.getNumberOfRetryAttempts(),
                             exceptionName);

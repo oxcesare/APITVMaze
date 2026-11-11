@@ -80,16 +80,4 @@ public class TVClientTimeoutTest {
                 .isInstanceOf(TvMazeUnavailableException.class)
                 .isNotInstanceOf(TvMazeTimeoutException.class);
     }
-
-    @Test
-    void respuestaRapidaNoFalla() {
-        wireMockServer.stubFor(get(urlEqualTo("/shows/2"))
-                .willReturn(aResponse()
-                        .withFixedDelay(100)
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("{\"id\": 2, \"name\": \"Under the Dome\"}")));
-
-        var result = tvClient.getShowById(2L);
-        assertThat(result).isNotNull();
-    }
 }

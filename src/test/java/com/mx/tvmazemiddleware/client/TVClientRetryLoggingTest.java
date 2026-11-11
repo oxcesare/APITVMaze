@@ -4,6 +4,7 @@ package com.mx.tvmazemiddleware.client;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.stubbing.Scenario;
+import com.mx.tvmazemiddleware.exception.TvMazeUnavailableException;
 import io.github.resilience4j.springboot3.retry.autoconfigure.RetryAutoConfiguration;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -19,9 +20,13 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
+import java.util.Arrays;
+import java.util.List;
+
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(classes = {
         TVClient.class,
@@ -66,6 +71,30 @@ public class TVClientRetryLoggingTest {
         registry.add("tvmaze.retry.initial-interval", () -> "10ms");
         registry.add("tvmaze.retry.multiplier", () -> "1.0");
         registry.add("tvmaze.retry.jitter", () -> "0.0");
+    }
+
+    private static List<String> entradasDeReintento(String salida) {
+        return Arrays.stream(salida.split("(?m)^(?=\\d{4}-\\d{2}-\\d{2}T)"))
+                .filter(entrada -> entrada.lines().findFirst().orElse("").contains("RetryLoggingConfig"))
+                .toList();
+    }
+
+    @Test
+    void agrupaLasLineasDeCadaEntradaDeReintento() {
+        String salida = """
+                2026-01-01T10:00:00 WARN RetryLoggingConfig : Reintento
+                java.lang.IllegalStateException: error
+                \tat ejemplo.Cliente.llamada(Cliente.java:1)
+                Caused by: java.lang.Exception: causa
+                2026-01-01T10:00:01 INFO OtroLogger : mensaje
+                \tat ejemplo.Otro.metodo(Otro.java:2)
+                """;
+
+        assertThat(entradasDeReintento(salida))
+                .singleElement()
+                .asString()
+                .contains("\tat ejemplo.Cliente.llamada", "Caused by: java.lang.Exception")
+                .doesNotContain("OtroLogger", "ejemplo.Otro");
     }
 
 
@@ -171,10 +200,13 @@ public class TVClientRetryLoggingTest {
         // 2. Ejecutar la llamada con la consulta centinela
         tvClient.searchShows(canaryQuery);
 
-        // 3. Capturar toda la salida registrada por nuestro logger de reintentos
-        String retryLogs = output.getAll().lines()
-                .filter(l -> l.contains("RetryLoggingConfig"))
-                .reduce("", (acc, line) -> acc + "\n" + line);
+        // 3. Capturar las entradas completas registradas por nuestro logger de reintentos
+        List<String> retryEntries = entradasDeReintento(output.getAll());
+        assertThat(retryEntries)
+                .as("Debe registrarse el primer reintento")
+                .hasSize(1)
+                .anySatisfy(entrada -> assertThat(entrada).contains("Reintento 1/2"));
+        String retryLogs = String.join("\n", retryEntries);
 
         String wireMockBaseUrl = wireMockServer.baseUrl();
 
@@ -212,28 +244,19 @@ public class TVClientRetryLoggingTest {
                 .whenScenarioStateIs("Final fail")
                 .willReturn(aResponse().withStatus(503)));
 
-        // 2. Ejecutar la llamada (capturando la excepción final por agotamiento de reintentos)
-        try {
-            tvClient.getShowById(1L);
-        } catch (Exception ignored) {
-            // Se espera que falle tras agotar los intentos
-        }
+        assertThatThrownBy(() -> tvClient.getShowById(1L))
+                .isInstanceOf(TvMazeUnavailableException.class);
+        wireMockServer.verify(3, getRequestedFor(urlPathEqualTo("/shows/1")));
 
-        // 3. Filtrar exclusivamente las líneas de log generadas por nuestro RetryLoggingConfig
-        var retryLogLines = output.getAll().lines()
-                .filter(l -> l.contains("RetryLoggingConfig"))
-                .toList();
-
-        // 4. Validar estrictamente que ninguna línea contenga indicios de trazas de pila
-        for (String line : retryLogLines) {
-            assertThat(line)
-                    .as("El log de reintentos no debe contener 'Caused by' (indicio de traza de pila)")
-                    .doesNotContain("Caused by");
-
-            assertThat(line.trim())
-                    .as("El log de reintentos no debe contener líneas que empiecen con 'at ' (trazas de pila compiladas)")
-                    .satisfies(l -> assertThat(l.startsWith("at ")).isFalse());
-        }
+        List<String> retryEntries = entradasDeReintento(output.getAll());
+        assertThat(retryEntries)
+                .as("Debe haber dos entradas de reintento y una de agotamiento")
+                .hasSize(3)
+                .anySatisfy(entrada -> assertThat(entrada).contains("Reintento 1/2"));
+        assertThat(retryEntries)
+                .allSatisfy(entrada -> assertThat(entrada)
+                        .as("La entrada de reintento no debe contener una traza de pila")
+                        .doesNotContain("Caused by", "\tat "));
     }
 
     @org.junit.jupiter.params.ParameterizedTest(name = "Un error HTTP {0} no debe generar líneas de reintento")
@@ -266,6 +289,28 @@ public class TVClientRetryLoggingTest {
 
     @Test
     void unaLlamadaExitosaNoGeneraLineas(CapturedOutput output) {
+        String scenarioName = "Positive logging control";
+        wireMockServer.stubFor(get(urlPathEqualTo("/shows/2"))
+                .inScenario(scenarioName)
+                .whenScenarioStateIs(Scenario.STARTED)
+                .willReturn(aResponse().withStatus(503))
+                .willSetStateTo("Success next"));
+        wireMockServer.stubFor(get(urlPathEqualTo("/shows/2"))
+                .inScenario(scenarioName)
+                .whenScenarioStateIs("Success next")
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"id\":2,\"name\":\"Control\"}")));
+
+        assertThat(tvClient.getShowById(2L).id()).isEqualTo(2L);
+        wireMockServer.verify(2, getRequestedFor(urlPathEqualTo("/shows/2")));
+        assertThat(entradasDeReintento(output.getAll()))
+                .as("El logger debe registrar el primer reintento de la llamada de control")
+                .isNotEmpty()
+                .anySatisfy(entrada -> assertThat(entrada).contains("Reintento 1/2"));
+        int outputLength = output.getAll().length();
+
         // 1. Configurar WireMock para que responda con éxito (200 OK) a la primera
         wireMockServer.stubFor(get(urlPathEqualTo("/shows/1"))
                 .willReturn(aResponse()
@@ -280,7 +325,7 @@ public class TVClientRetryLoggingTest {
         wireMockServer.verify(1, getRequestedFor(urlPathEqualTo("/shows/1")));
 
         // 4. Filtrar exclusivamente las líneas de log generadas por nuestro RetryLoggingConfig
-        long retryLogCount = output.getAll().lines()
+        long retryLogCount = output.getAll().substring(outputLength).lines()
                 .filter(l -> l.contains("RetryLoggingConfig"))
                 .count();
 
@@ -312,36 +357,20 @@ public class TVClientRetryLoggingTest {
                 .whenScenarioStateIs("Retry 2")
                 .willReturn(aResponse().withStatus(503)));
 
-        // Ejecutar la llamada esperando que lance la excepción por agotamiento
-        try {
-            tvClient.getShowById(1L);
-        } catch (Exception ignored) {
-            // Excepción esperada al agotarse los reintentos
-        }
+        assertThatThrownBy(() -> tvClient.getShowById(1L))
+                .isInstanceOf(TvMazeUnavailableException.class);
+        wireMockServer.verify(3, getRequestedFor(urlPathEqualTo("/shows/1")));
 
-        // Filtrar las líneas de reintento (WARN) y la de agotamiento (ERROR)
-        var retryLines = output.getAll().lines()
-                .filter(l -> l.contains("RetryLoggingConfig"))
-                .filter(l -> l.contains("WARN"))
-                .toList();
-
-        var exhaustedLines = output.getAll().lines()
-                .filter(l -> l.contains("RetryLoggingConfig"))
-                .filter(l -> l.contains("ERROR"))
-                .toList();
-
-        // Validaciones estrictas
-        assertThat(retryLines)
-                .as("Debe haber exactamente dos líneas de reintento intermedio")
-                .hasSize(2);
-
-        assertThat(exhaustedLines)
-                .as("Debe registrarse exactamente una línea indicando que los reintentos se agotaron")
-                .hasSize(1);
-
-        assertThat(exhaustedLines.get(0))
-                .as("La línea de agotamiento debe mencionar la instancia 'tvmaze' y que se agotaron los intentos")
-                .contains("tvmaze")
-                .contains("Reintentos agotados");
+        assertThat(entradasDeReintento(output.getAll()))
+                .as("Deben registrarse dos reintentos y un agotamiento, todos como WARN")
+                .hasSize(3)
+                .satisfiesExactly(
+                        first -> assertThat(first).contains("WARN", "Reintento 1/2"),
+                        second -> assertThat(second).contains("WARN", "Reintento 2/2"),
+                        exhausted -> assertThat(exhausted)
+                                .contains("WARN", "Reintentos agotados", "tvmaze", "3 intentos",
+                                        "TvMazeUnavailableException"))
+                .allSatisfy(entrada -> assertThat(entrada.lines().findFirst().orElseThrow())
+                        .doesNotContain("ERROR"));
     }
 }
