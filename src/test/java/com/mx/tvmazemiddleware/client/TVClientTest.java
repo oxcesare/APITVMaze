@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
@@ -29,9 +30,12 @@ import java.net.UnknownHostException;
 import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpTimeoutException;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -134,10 +138,15 @@ class TVClientTest {
     @Test
     @SuppressWarnings("unchecked")
     void lanzarExceptionCuandoTVNoEsteDisponible() {
-        when(restClient.get()).thenThrow(new RestClientException("Timeout"));
+        when(restClient.get()).thenReturn(requestHeadersUriSpec);
+        when(requestHeadersUriSpec.uri(eq("/shows/{id}"), eq(1L))).thenReturn(requestHeadersSpec);
+        when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.body(ShowDetailResponse.class)).thenThrow(new RestClientException("Timeout"));
 
         assertThatThrownBy(() -> tvClient.getShowById(1L))
-                .isInstanceOf(TvMazeUnavailableException.class);
+                .isExactlyInstanceOf(TvMazeUnavailableException.class)
+                .hasMessage("Error de acceso al consultar TVMaze")
+                .hasCauseInstanceOf(RestClientException.class);
     }
 
     @Test
@@ -148,6 +157,41 @@ class TVClientTest {
         assertThatThrownBy(() -> tvClient.getShowById(1L)).isSameAs(error);
         assertThatThrownBy(() -> tvClient.getEpisodeById(1L)).isSameAs(error);
         assertThatThrownBy(() -> tvClient.searchShows("girls")).isSameAs(error);
+    }
+
+    static Stream<Arguments> operaciones() {
+        return Stream.of(
+                Arguments.of("getShowById", (Consumer<TVClient>) c -> c.getShowById(1L)),
+                Arguments.of("getEpisodeById", (Consumer<TVClient>) c -> c.getEpisodeById(1L)),
+                Arguments.of("searchShows", (Consumer<TVClient>) c -> c.searchShows("girls")));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("operaciones")
+    @SuppressWarnings("unchecked")
+    void unIllegalArgumentDeLaConstruccionDeLaUriNoSeTraduce(String nombre, Consumer<TVClient> operacion) {
+        IllegalArgumentException error =
+                new IllegalArgumentException("Not enough variable values available to expand 'id'");
+        when(restClient.get()).thenReturn(requestHeadersUriSpec);
+        when(requestHeadersUriSpec.uri(anyString(), any(Object[].class))).thenThrow(error);
+
+        assertThatThrownBy(() -> operacion.accept(tvClient)).isSameAs(error);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("operaciones")
+    @SuppressWarnings("unchecked")
+    void unIllegalArgumentDeLaRespuestaSeTraduce(String nombre, Consumer<TVClient> operacion) {
+        when(restClient.get()).thenReturn(requestHeadersUriSpec);
+        when(requestHeadersUriSpec.uri(anyString(), any(Object[].class))).thenReturn(requestHeadersSpec);
+        when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.body(any(Class.class)))
+                .thenThrow(new IllegalArgumentException("Status code '-1' should be a three-digit positive integer"));
+
+        assertThatThrownBy(() -> operacion.accept(tvClient))
+                .isExactlyInstanceOf(TvMazeUnavailableException.class)
+                .hasMessage("Error de acceso al consultar TVMaze")
+                .hasCauseInstanceOf(RestClientException.class);
     }
 
     @Test

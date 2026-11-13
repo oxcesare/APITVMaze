@@ -29,44 +29,33 @@ public class TVClient {
 
     @Retry(name = "tvmaze")
     public EpisodeDetailResponse getEpisodeById(Long episodeId) {
+        var request = restClient.get().uri("/episodes/{id}", episodeId);
         try {
-            return restClient.get()
-                    .uri("/episodes/{id}", episodeId)
-                    .retrieve()
-                    .body(EpisodeDetailResponse.class);
-        } catch (RestClientException ex) {
-            throw translateException(ex, () -> new TvNotShowException(String.valueOf(episodeId)),
-                    "obtener el episodio con ID " + episodeId);
+            return request.retrieve().body(EpisodeDetailResponse.class);
+        } catch (RestClientException | IllegalArgumentException ex) {
+            throw translateException(ex, () -> new TvNotShowException(String.valueOf(episodeId)));
         }
     }
 
     @Retry(name = "tvmaze")
     public ShowDetailResponse getShowById(Long showId) {
-
+        var request = restClient.get().uri("/shows/{id}", showId);
         try {
-            return restClient.get()
-                    .uri("/shows/{id}", showId)
-                    .retrieve()
-                    .body(ShowDetailResponse.class);
-        } catch (RestClientException ex) {
-            throw translateException(ex, () -> new TvNotShowException(String.valueOf(showId)),
-                    "obtener el show con ID " + showId);
+            return request.retrieve().body(ShowDetailResponse.class);
+        } catch (RestClientException | IllegalArgumentException ex) {
+            throw translateException(ex, () -> new TvNotShowException(String.valueOf(showId)));
         }
     }
 
     @Retry(name = "tvmaze")
     public List<ShowResponse> searchShows(String searchQuery) {
+        var request = restClient.get().uri("/search/shows?q={q}", searchQuery);
 
         SearchResultItem[] results;
-
         try {
-            results = restClient.get()
-                    .uri("/search/shows?q={q}", searchQuery)
-                    .retrieve()
-                    .body(SearchResultItem[].class);
-        } catch (RestClientException ex) {
-            throw translateException(ex, () -> new TvShowSearchEmptyException(searchQuery),
-                    "buscar shows con la consulta " + searchQuery);
+            results = request.retrieve().body(SearchResultItem[].class);
+        } catch (RestClientException | IllegalArgumentException ex) {
+            throw translateException(ex, () -> new TvShowSearchEmptyException(searchQuery));
         }
 
         if (results == null || results.length == 0) {
@@ -78,34 +67,44 @@ public class TVClient {
                 .toList();
     }
 
+
     record SearchResultItem(ShowResponse show) {
     }
 
-    private RuntimeException translateException(RestClientException ex, Supplier<RuntimeException> notFound, String operation) {
-        if (ex instanceof RestClientResponseException responseException) {
+    private RuntimeException translateException(RuntimeException ex, Supplier<RuntimeException> notFound) {
+        RestClientException clientException = ex instanceof RestClientException restClientException
+                ? restClientException
+                : new RestClientException("Respuesta inválida de TVMaze", ex);
+
+        if (clientException instanceof RestClientResponseException responseException) {
             if (responseException.getStatusCode().value() == 429) {
-                return new TvMazeRateLimitException("Se excedió el límite de peticiones", ex);
+                return new TvMazeRateLimitException("Se excedió el límite de peticiones", clientException);
             }
             if (responseException.getStatusCode().value() == 404) {
                 return notFound.get();
             }
             if (responseException.getStatusCode().is4xxClientError()) {
                 return new TvMazeClientErrorException(
-                        "TVMaze rechazó la solicitud con HTTP " + responseException.getStatusCode().value(), ex);
+                        "TVMaze rechazó la solicitud con HTTP " + responseException.getStatusCode().value(),
+                        clientException);
+
+
+
             }
             return new TvMazeUnavailableException(
-                    "TVMaze respondió con un error HTTP " + responseException.getStatusCode().value(), ex);
+                    "TVMaze respondió con un error HTTP " + responseException.getStatusCode().value(), clientException);
         }
-        if (ex instanceof ResourceAccessException) {
-            if (hasCause(ex, SocketTimeoutException.class) || hasCause(ex, HttpTimeoutException.class)) {
-                return new TvMazeTimeoutException("Timeout al consultar TVMaze", ex);
+        if (clientException instanceof ResourceAccessException) {
+            if (hasCause(clientException, SocketTimeoutException.class)
+                    || hasCause(clientException, HttpTimeoutException.class)) {
+                return new TvMazeTimeoutException("Timeout al consultar TVMaze", clientException);
             }
-            if (hasCause(ex, ConnectException.class)) {
-                return new TvMazeUnavailableException("No se pudo establecer conexión con TVMaze", ex);
+            if (hasCause(clientException, ConnectException.class)) {
+                return new TvMazeUnavailableException("No se pudo establecer conexión con TVMaze", clientException);
             }
-            return new TvMazeUnavailableException("Error de acceso al consultar TVMaze", ex);
+            return new TvMazeUnavailableException("Error de acceso al consultar TVMaze", clientException);
         }
-        return new TvMazeUnavailableException("Error inesperado al " + operation, ex);
+        return new TvMazeUnavailableException("Error de acceso al consultar TVMaze", clientException);
     }
 
     private boolean hasCause(Throwable ex, Class<? extends Throwable> type) {

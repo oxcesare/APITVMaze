@@ -158,7 +158,8 @@ public class TVClientRetryTest {
     @ParameterizedTest(name = "{0} HTTP {3}")
     @MethodSource("metodosYEstados4xx")
     void clasifica4xxSinReintentar(String nombre, String url, Function<TVClient, ?> invocar, int status) {
-        wireMockServer.stubFor(get(urlEqualTo(url)).willReturn(aResponse().withStatus(status)));
+        wireMockServer.stubFor(get(urlEqualTo(url))
+                .willReturn(aResponse().withStatus(status).withBody("CANARIO-4XX-123")));
 
         Class<? extends RuntimeException> expected = switch (status) {
             case 400, 401, 403 -> TvMazeClientErrorException.class;
@@ -167,6 +168,9 @@ public class TVClientRetryTest {
             default -> throw new IllegalStateException("Estado inesperado: " + status);
         };
         var assertion = assertThatThrownBy(() -> invocar.apply(tvClient)).isExactlyInstanceOf(expected);
+        assertion.satisfies(ex -> assertThat(ex.getMessage())
+                .doesNotContain("CANARIO-4XX-123")
+                .doesNotContain(wireMockServer.baseUrl()));
         if (expected == TvMazeClientErrorException.class) {
             assertion.hasMessageContaining(String.valueOf(status));
         }
@@ -190,7 +194,8 @@ public class TVClientRetryTest {
                 .whenScenarioStateIs(Scenario.STARTED)
                 .willReturn(aResponse()
                         .withStatus(503)
-                        .withHeader("Content-Type", "application/json"))
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("CANARIO-4XX-123"))
                 .willSetStateTo("First Attempt Failed"));
 
         wireMockServer.stubFor(get(urlEqualTo("/shows/1"))
@@ -198,13 +203,15 @@ public class TVClientRetryTest {
                 .whenScenarioStateIs("First Attempt Failed")
                 .willReturn(aResponse()
                         .withStatus(503)
-                        .withHeader("Content-Type", "application/json"))
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("CANARIO-4XX-123"))
                 .willSetStateTo("Second Attempt Failed"));
 
-        org.junit.jupiter.api.Assertions.assertThrows(
-                com.mx.tvmazemiddleware.exception.TvMazeUnavailableException.class,
-                () -> tvClient.getShowById(1L)
-        );
+        assertThatThrownBy(() -> tvClient.getShowById(1L))
+                .isInstanceOf(TvMazeUnavailableException.class)
+                .satisfies(ex -> assertThat(ex.getMessage())
+                        .doesNotContain("CANARIO-4XX-123")
+                        .doesNotContain(wireMockServer.baseUrl()));
         wireMockServer.verify(2, getRequestedFor(urlEqualTo("/shows/1")));
     }
 

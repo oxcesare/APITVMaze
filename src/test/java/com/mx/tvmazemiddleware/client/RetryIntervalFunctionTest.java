@@ -53,8 +53,9 @@ class RetryIntervalFunctionTest {
 
     @ParameterizedTest
     @CsvSource({
-            "2.0, -0.1, El factor de jitter debe estar entre 0.0 y 1.0",
-            "2.0,  1.5, El factor de jitter debe estar entre 0.0 y 1.0",
+            "2.0, -0.1, El factor de jitter debe ser mayor o igual a 0.0 y menor que 1.0",
+            "2.0,  1.0, El factor de jitter debe ser mayor o igual a 0.0 y menor que 1.0",
+            "2.0,  1.5, El factor de jitter debe ser mayor o igual a 0.0 y menor que 1.0",
             "0.5,  0.5, El multiplicador debe ser al menos 1.0"
     })
     void configuracionInvalidaDebeLanzarExcepcion(double multiplier, double jitter, String mensaje) {
