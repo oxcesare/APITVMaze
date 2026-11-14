@@ -86,17 +86,32 @@ public class TVClientCircuitBreakerSlowCallTest {
                 .willReturn(aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
-                        .withBody("{\"id\":1,\"name\":\"Girls\"}")
+                        .withBody("{\"id\":1,\"name\":\"Girls\"}")));
+        wireMockServer.stubFor(get(urlPathEqualTo("/shows/2"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"id\":2,\"name\":\"Girls\"}")
                         .withFixedDelay(500)));
 
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 4; i++) {
             assertThat(tvClient.getShowById(1L)).isNotNull();
+        }
+        for (int i = 0; i < 3; i++) {
+            assertThat(tvClient.getShowById(2L)).isNotNull();
         }
 
         CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker("tvmaze");
+        assertThat(circuitBreaker.getState()).isEqualTo(CircuitBreaker.State.CLOSED);
+        assertThat(circuitBreaker.getMetrics().getNumberOfSlowCalls()).isEqualTo(3);
+
+        assertThat(tvClient.getShowById(2L)).isNotNull();
         assertThat(circuitBreaker.getState()).isEqualTo(CircuitBreaker.State.OPEN);
-        assertThat(circuitBreaker.getMetrics().getNumberOfSlowCalls()).isEqualTo(5);
+        assertThat(circuitBreaker.getMetrics().getNumberOfSlowCalls()).isEqualTo(4);
+        assertThat(circuitBreaker.getMetrics().getNumberOfSuccessfulCalls()).isEqualTo(8);
         assertThat(circuitBreaker.getMetrics().getNumberOfFailedCalls()).isEqualTo(0);
+        wireMockServer.verify(4, getRequestedFor(urlPathEqualTo("/shows/1")));
+        wireMockServer.verify(4, getRequestedFor(urlPathEqualTo("/shows/2")));
 
         wireMockServer.resetRequests();
         assertThatThrownBy(() -> tvClient.getShowById(1L))
