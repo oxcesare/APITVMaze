@@ -78,6 +78,17 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void circuitoAbiertoIndicaRetryAfterConLaEsperaDelCircuito() throws Exception {
+        CircuitBreaker breaker = circuitBreakerRegistry.circuitBreaker("tvmaze");
+        given(tvMazeService.getShowById(1L))
+                .willThrow(CallNotPermittedException.createCallNotPermittedException(breaker));
+
+        mockMvc.perform(get(ApiConstants.V1 + "/shows/1"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(header().string("Retry-After", "7"));
+    }
+
+    @Test
     void showNoEncontradoTieneTypePropio() throws Exception {
         when(tvMazeService.getShowById(99L)).thenThrow(new TvNotShowException("99"));
 
