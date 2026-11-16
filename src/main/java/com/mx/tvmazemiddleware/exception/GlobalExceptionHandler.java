@@ -2,6 +2,7 @@ package com.mx.tvmazemiddleware.exception;
 
 
 import com.mx.tvmazemiddleware.util.ApiConstants;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -32,6 +33,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static final URI RATING_ALREADY_EXISTS = URI.create("urn:tvmaze:problem:rating-already-exists");
     private static final URI SEARCH_NO_RESULTS = URI.create("urn:tvmaze:problem:search-no-results");
     private static final URI UPSTREAM_UNAVAILABLE = URI.create("urn:tvmaze:problem:upstream-unavailable");
+    private static final URI UPSTREAM_CIRCUIT_OPEN = URI.create("urn:tvmaze:problem:upstream-circuit-open");
     private static final URI RATE_LIMITED = URI.create("urn:tvmaze:problem:rate-limited");
     private static final URI INTERNAL_ERROR = URI.create("urn:tvmaze:problem:internal-error");
     private static final URI VALIDATION_ERROR = URI.create("urn:tvmaze:problem:validation-error");
@@ -94,6 +96,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.SERVICE_UNAVAILABLE, "El servicio externo no está disponible");
         pd.setType(UPSTREAM_UNAVAILABLE);
         pd.setTitle("Dependencia no disponible");
+        return pd;
+    }
+
+
+    @ExceptionHandler(CallNotPermittedException.class)
+    public ProblemDetail handleCircuitOpen(CallNotPermittedException ex) {
+        log.warn("Circuito abierto: {}", ex.getCausingCircuitBreakerName());
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(
+                HttpStatus.SERVICE_UNAVAILABLE, "El servicio externo está temporalmente no disponible");
+        pd.setType(UPSTREAM_CIRCUIT_OPEN);
+        pd.setTitle("Servicio externo temporalmente no disponible");
         return pd;
     }
 

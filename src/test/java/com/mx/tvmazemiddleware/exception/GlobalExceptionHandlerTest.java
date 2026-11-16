@@ -4,13 +4,21 @@ import com.mx.tvmazemiddleware.client.TVClient;
 import com.mx.tvmazemiddleware.controller.TVMazeController;
 import com.mx.tvmazemiddleware.service.TVMazeService;
 import com.mx.tvmazemiddleware.util.ApiConstants;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Bean;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
@@ -25,6 +33,22 @@ class GlobalExceptionHandlerTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private CircuitBreakerRegistry circuitBreakerRegistry;
+
+    @TestConfiguration
+    static class CircuitBreakerTestConfiguration {
+        @Bean
+        CircuitBreakerRegistry circuitBreakerRegistry() {
+            CircuitBreakerConfig config = CircuitBreakerConfig.custom()
+                    .waitDurationInOpenState(Duration.ofSeconds(7))
+                    .build();
+            CircuitBreakerRegistry registry = CircuitBreakerRegistry.of(config);
+            registry.circuitBreaker("tvmaze");
+            return registry;
+        }
+    }
+
     @MockBean
     private JwtDecoder jwtDecoder;
 
@@ -33,6 +57,25 @@ class GlobalExceptionHandlerTest {
 
     @MockBean
     private TVMazeService tvMazeService;
+
+    @Test
+    void circuitoAbiertoDevuelve503ConProblemDetail() throws Exception {
+        CircuitBreaker breaker = circuitBreakerRegistry.circuitBreaker("tvmaze");
+        given(tvMazeService.getShowById(1L))
+                .willThrow(CallNotPermittedException.createCallNotPermittedException(breaker));
+
+        String body = mockMvc.perform(get(ApiConstants.V1 + "/shows/1"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+                .andExpect(jsonPath("$.type").value("urn:tvmaze:problem:upstream-circuit-open"))
+                .andExpect(jsonPath("$.status").value(503))
+                .andExpect(jsonPath("$.title").value("Servicio externo temporalmente no disponible"))
+                .andExpect(jsonPath("$.detail").value("El servicio externo está temporalmente no disponible"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(body)
+                .doesNotContain("CircuitBreaker", "CallNotPermitted", "io.github");
+    }
 
     @Test
     void showNoEncontradoTieneTypePropio() throws Exception {
