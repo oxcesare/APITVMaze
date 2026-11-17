@@ -170,4 +170,17 @@ class GlobalExceptionHandlerTest {
                 .doesNotContain("\tat ")
                 .doesNotContain("Read timed out");
     }
+
+    @Test
+    void unavailableSigueSiendo503SinRetryAfter() throws Exception {
+        given(tvMazeService.getShowById(1L))
+                .willThrow(new TvMazeUnavailableException("TVMaze caído", new RuntimeException()));
+
+        mockMvc.perform(get(ApiConstants.V1 + "/shows/1"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+                .andExpect(jsonPath("$.type").value("urn:tvmaze:problem:upstream-unavailable"))
+                .andExpect(jsonPath("$.detail").value("El servicio externo no está disponible"))
+                .andExpect(header().doesNotExist("Retry-After"));
+    }
 }

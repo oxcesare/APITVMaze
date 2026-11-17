@@ -93,6 +93,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return pd;
     }
 
+
     @ExceptionHandler(TvMazeUnavailableException.class)
     public ProblemDetail handleUnavailable(TvMazeUnavailableException ex) {
         log.error("TVMaze no disponible", ex);
