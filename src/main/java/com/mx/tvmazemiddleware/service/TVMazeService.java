@@ -32,10 +32,6 @@ public class TVMazeService {
     public List<ShowResponse> searchShows(String searchQuery) {
         List<ShowResponse> shows = tvClient.searchShows(searchQuery);
 
-        if (shows.isEmpty()) {
-            return shows;
-        }
-
         List<Long> showIds = shows.stream().map(ShowResponse::getId).toList();
 
         Map<Long, List<RatingInfo>> commentsByShowId = ratingRepository.findByShowIdIn(showIds).stream()
@@ -86,5 +82,4 @@ public class TVMazeService {
         );
     }
 }
-
 

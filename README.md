@@ -101,6 +101,7 @@ Los errores se devuelven como `ProblemDetail` (RFC 7807) con un `type` estable d
 
 ### Decisiones de diseño
 
+- **Búsqueda sin resultados**: responde HTTP 404 con el tipo `search-no-results`; no devuelve HTTP 200 con una lista vacía.
 - **201 en `POST /ratings`**: se crea un recurso nuevo; la respuesta incluye `ratingId`.
 - **400 vs 422 vs 409**: 400 se reserva para requests mal formados o que no pasan validación. 422 indica que la request es válida sintácticamente pero referencia un show que no existe en nuestra base. 409 indica que la request es válida pero choca con el estado actual (ya existe un rating del mismo `userId` para el `showId`).
 - **Rating duplicado**: antes se respondía con éxito HTTP y `status: "error"` en el body. Ahora se lanza `RatingAlreadyExistsException` y se responde 409 con `showId`, `userId` y el `ratingId` existente, para que el cliente pueda distinguirlo sin inspeccionar el body de un 201.

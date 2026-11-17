@@ -347,3 +347,34 @@ adjunta solo; además la API es stateless y no hay sesión. Por eso se desactiva
 si algún día el token pasa a una cookie, hay que reactivarla.
 
 
+
+**los fallos de red físicos de WireMock producen las siguientes excepciones y causas raíz típicas:**
+
+**CONNECTION_RESET_BY_PEER:**
+
+**Excepción capturada: TvMazeUnavailableException (envuelta por la capa de traducción del cliente).**
+
+**Causa raíz habitual: java.net.SocketException (con el mensaje "Connection reset").**
+
+**EMPTY_RESPONSE:**
+
+**Excepción capturada: TvMazeUnavailableException.**
+
+**Causa raíz habitual: java.net.ProtocolException o un error de**
+**lectura de stream (java.io.EOFException), ya que el servidor cierra la conexión sin enviar bytes de respuesta.**
+
+**MALFORMED_RESPONSE_CHUNK:**
+
+**Excepción capturada: TvMazeUnavailableException.**
+
+**Causa raíz habitual: java.io.IOException o java.net.ProtocolException debido a**
+**la alteración o corrupción en la transferencia por fragmentos (chunked transfer encoding).**
+
+**RANDOM_DATA_THEN_CLOSE:
+
+**Excepción capturada: TvMazeUnavailableException.**
+
+**Causa raíz habitual: java.io.IOException o java.net.ProtocolException al recibir basura binaria inesperada**
+**en lugar de una respuesta HTTP válida.**
+
+-Por esta razón (al ser clases de bajo nivel que varían entre proveedores de sockets o versiones del JDK), el diseño correcto es no fijar comprobaciones estrictas sobre la clase exacta de la causa raíz más allá de RestClientException o IOException, permitiendo que el middleware las capture genéricamente y las traduzca de forma limpia a TvMazeUnavailableException.
