@@ -4,6 +4,7 @@ import com.mx.tvmazemiddleware.dto.EpisodeDetailResponse;
 import com.mx.tvmazemiddleware.dto.ShowDetailResponse;
 import com.mx.tvmazemiddleware.dto.ShowResponse;
 import com.mx.tvmazemiddleware.exception.*;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
@@ -28,6 +29,7 @@ public class TVClient {
     }
 
     @Retry(name = "tvmaze")
+    @CircuitBreaker(name = "tvmaze")
     public EpisodeDetailResponse getEpisodeById(Long episodeId) {
         var request = restClient.get().uri("/episodes/{id}", episodeId);
         try {
@@ -38,6 +40,7 @@ public class TVClient {
     }
 
     @Retry(name = "tvmaze")
+    @CircuitBreaker(name = "tvmaze")
     public ShowDetailResponse getShowById(Long showId) {
         var request = restClient.get().uri("/shows/{id}", showId);
         try {
@@ -48,6 +51,7 @@ public class TVClient {
     }
 
     @Retry(name = "tvmaze")
+    @CircuitBreaker(name = "tvmaze")
     public List<ShowResponse> searchShows(String searchQuery) {
         var request = restClient.get().uri("/search/shows?q={q}", searchQuery);
 

@@ -2,16 +2,15 @@ package com.mx.tvmazemiddleware.exception;
 
 
 import com.mx.tvmazemiddleware.util.ApiConstants;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
-import org.springframework.http.ProblemDetail;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.ErrorResponse;
+import org.springframework.http.*;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -32,11 +31,18 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static final URI RATING_ALREADY_EXISTS = URI.create("urn:tvmaze:problem:rating-already-exists");
     private static final URI SEARCH_NO_RESULTS = URI.create("urn:tvmaze:problem:search-no-results");
     private static final URI UPSTREAM_UNAVAILABLE = URI.create("urn:tvmaze:problem:upstream-unavailable");
+    private static final URI UPSTREAM_CIRCUIT_OPEN = URI.create("urn:tvmaze:problem:upstream-circuit-open");
     private static final URI RATE_LIMITED = URI.create("urn:tvmaze:problem:rate-limited");
     private static final URI INTERNAL_ERROR = URI.create("urn:tvmaze:problem:internal-error");
     private static final URI VALIDATION_ERROR = URI.create("urn:tvmaze:problem:validation-error");
     private static final URI INVALID_CREDENTIALS = URI.create("urn:tvmaze:problem:invalid-credentials");
     private static final URI TIME_OUT_CODE = URI.create("urn:tvmaze:problem:upstream-timeout");
+
+    private final ObjectProvider<CircuitBreakerRegistry> circuitBreakerRegistry;
+
+    public GlobalExceptionHandler(ObjectProvider<CircuitBreakerRegistry> circuitBreakerRegistry) {
+        this.circuitBreakerRegistry = circuitBreakerRegistry;
+    }
 
     @ExceptionHandler(InvalidSortFieldException.class)
     public ProblemDetail handleInvalidSortField(InvalidSortFieldException ex) {
@@ -87,6 +93,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return pd;
     }
 
+
     @ExceptionHandler(TvMazeUnavailableException.class)
     public ProblemDetail handleUnavailable(TvMazeUnavailableException ex) {
         log.error("TVMaze no disponible", ex);
@@ -95,6 +102,26 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         pd.setType(UPSTREAM_UNAVAILABLE);
         pd.setTitle("Dependencia no disponible");
         return pd;
+    }
+
+
+    @ExceptionHandler(CallNotPermittedException.class)
+    public ResponseEntity<ProblemDetail> handleCircuitOpen(CallNotPermittedException ex) {
+        log.warn("Circuito abierto: {}", ex.getCausingCircuitBreakerName());
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(
+                HttpStatus.SERVICE_UNAVAILABLE, "El servicio externo está temporalmente no disponible");
+        pd.setType(UPSTREAM_CIRCUIT_OPEN);
+        pd.setTitle("Servicio externo temporalmente no disponible");
+
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE);
+        CircuitBreakerRegistry registry = circuitBreakerRegistry.getIfAvailable();
+        if (registry != null) {
+            registry.find(ex.getCausingCircuitBreakerName()).ifPresent(breaker -> {
+                long waitMillis = breaker.getCircuitBreakerConfig().getWaitIntervalFunctionInOpenState().apply(1);
+                response.header(HttpHeaders.RETRY_AFTER, String.valueOf(Math.max(1, (waitMillis + 999) / 1000)));
+            });
+        }
+        return response.body(pd);
     }
 
     @ExceptionHandler(TvShowSearchEmptyException.class)

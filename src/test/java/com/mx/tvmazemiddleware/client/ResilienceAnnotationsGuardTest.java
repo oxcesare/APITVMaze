@@ -1,5 +1,6 @@
 package com.mx.tvmazemiddleware.client;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -41,6 +42,44 @@ class ResilienceAnnotationsGuardTest {
         // Validación exacta de arquitectura
         assertThat(metodosConRetry)
                 .as("El conjunto de métodos con @Retry debe coincidir exactamente con las tres lecturas permitidas")
+                .containsExactlyInAnyOrder(
+                        "TVClient#getShowById",
+                        "TVClient#searchShows",
+                        "TVClient#getEpisodeById"
+                );
+    }
+
+    @Test
+    void circuitBreakerTvmazeEstaExactamenteEnLosMismosMetodosQueRetry() throws ClassNotFoundException {
+        Set<String> metodosConRetry = new HashSet<>();
+        Set<String> metodosConBreaker = new HashSet<>();
+
+        for (Class<?> clase : clasesDeProduccion()) {
+            assertThat(AnnotatedElementUtils.hasAnnotation(clase, CircuitBreaker.class))
+                    .as("La clase %s no debe tener @CircuitBreaker a nivel de clase", clase.getSimpleName())
+                    .isFalse();
+
+            for (Method method : clase.getDeclaredMethods()) {
+                if (method.isSynthetic()) {
+                    continue;
+                }
+                String id = clase.getSimpleName() + "#" + method.getName();
+                if (AnnotatedElementUtils.hasAnnotation(method, Retry.class)) {
+                    metodosConRetry.add(id);
+                }
+                CircuitBreaker breaker = AnnotatedElementUtils.findMergedAnnotation(method, CircuitBreaker.class);
+                if (breaker != null) {
+                    assertThat(breaker.name())
+                            .as("@CircuitBreaker de %s debe usar el circuito compartido 'tvmaze'", id)
+                            .isEqualTo("tvmaze");
+                    metodosConBreaker.add(id);
+                }
+            }
+        }
+
+        assertThat(metodosConBreaker)
+                .as("@CircuitBreaker(name=\"tvmaze\") debe estar exactamente en los mismos métodos que @Retry")
+                .containsExactlyInAnyOrderElementsOf(metodosConRetry)
                 .containsExactlyInAnyOrder(
                         "TVClient#getShowById",
                         "TVClient#searchShows",
