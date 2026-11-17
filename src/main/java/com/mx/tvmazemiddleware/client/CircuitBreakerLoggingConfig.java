@@ -21,6 +21,7 @@ public class CircuitBreakerLoggingConfig {
         return new RegistryEventConsumer<>() {
             @Override
             public void onEntryAddedEvent(EntryAddedEvent<CircuitBreaker> entryAddedEvent) {
+
                 entryAddedEvent.getAddedEntry().getEventPublisher().onStateTransition(event -> {
                     CircuitBreaker.StateTransition transition = event.getStateTransition();
                     if (transition.getToState() == CircuitBreaker.State.OPEN) {
