@@ -4,6 +4,7 @@ import com.mx.tvmazemiddleware.dto.EpisodeDetailResponse;
 import com.mx.tvmazemiddleware.dto.ShowDetailResponse;
 import com.mx.tvmazemiddleware.dto.ShowResponse;
 import com.mx.tvmazemiddleware.exception.*;
+import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.stereotype.Component;
@@ -30,6 +31,7 @@ public class TVClient {
 
     @Retry(name = "tvmaze")
     @CircuitBreaker(name = "tvmaze")
+    @Bulkhead(name = "tvmaze", type = Bulkhead.Type.SEMAPHORE)
     public EpisodeDetailResponse getEpisodeById(Long episodeId) {
         var request = restClient.get().uri("/episodes/{id}", episodeId);
         try {
@@ -41,6 +43,7 @@ public class TVClient {
 
     @Retry(name = "tvmaze")
     @CircuitBreaker(name = "tvmaze")
+    @Bulkhead(name = "tvmaze", type = Bulkhead.Type.SEMAPHORE)
     public ShowDetailResponse getShowById(Long showId) {
         var request = restClient.get().uri("/shows/{id}", showId);
         try {
@@ -52,6 +55,7 @@ public class TVClient {
 
     @Retry(name = "tvmaze")
     @CircuitBreaker(name = "tvmaze")
+    @Bulkhead(name = "tvmaze", type = Bulkhead.Type.SEMAPHORE)
     public List<ShowResponse> searchShows(String searchQuery) {
         var request = restClient.get().uri("/search/shows?q={q}", searchQuery);
 
@@ -91,7 +95,6 @@ public class TVClient {
                 return new TvMazeClientErrorException(
                         "TVMaze rechazó la solicitud con HTTP " + responseException.getStatusCode().value(),
                         clientException);
-
 
 
             }
