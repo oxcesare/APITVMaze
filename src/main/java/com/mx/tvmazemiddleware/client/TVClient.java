@@ -4,6 +4,7 @@ import com.mx.tvmazemiddleware.dto.EpisodeDetailResponse;
 import com.mx.tvmazemiddleware.dto.ShowDetailResponse;
 import com.mx.tvmazemiddleware.dto.ShowResponse;
 import com.mx.tvmazemiddleware.exception.*;
+import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
@@ -23,6 +24,8 @@ import java.util.function.Supplier;
 @Component
 public class TVClient {
 
+    private static final String OVERLOADED_MESSAGE = "El servicio externo está saturado";
+
     private final RestClient restClient;
 
     public TVClient(RestClient restClient) {
@@ -31,7 +34,7 @@ public class TVClient {
 
     @Retry(name = "tvmaze")
     @CircuitBreaker(name = "tvmaze")
-    @Bulkhead(name = "tvmaze", type = Bulkhead.Type.SEMAPHORE)
+    @Bulkhead(name = "tvmaze", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "bulkheadFullEpisode")
     public EpisodeDetailResponse getEpisodeById(Long episodeId) {
         var request = restClient.get().uri("/episodes/{id}", episodeId);
         try {
@@ -43,7 +46,7 @@ public class TVClient {
 
     @Retry(name = "tvmaze")
     @CircuitBreaker(name = "tvmaze")
-    @Bulkhead(name = "tvmaze", type = Bulkhead.Type.SEMAPHORE)
+    @Bulkhead(name = "tvmaze", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "bulkheadFull")
     public ShowDetailResponse getShowById(Long showId) {
         var request = restClient.get().uri("/shows/{id}", showId);
         try {
@@ -53,9 +56,11 @@ public class TVClient {
         }
     }
 
+
+
     @Retry(name = "tvmaze")
     @CircuitBreaker(name = "tvmaze")
-    @Bulkhead(name = "tvmaze", type = Bulkhead.Type.SEMAPHORE)
+    @Bulkhead(name = "tvmaze", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "bulkheadFullSearch")
     public List<ShowResponse> searchShows(String searchQuery) {
         var request = restClient.get().uri("/search/shows?q={q}", searchQuery);
 
@@ -75,6 +80,18 @@ public class TVClient {
                 .toList();
     }
 
+
+    private ShowDetailResponse bulkheadFull(Long showId, BulkheadFullException ex) {
+        throw new TvMazeOverloadedException(OVERLOADED_MESSAGE);
+    }
+
+    private List<ShowResponse> bulkheadFullSearch(String searchQuery, BulkheadFullException ex) {
+        throw new TvMazeOverloadedException(OVERLOADED_MESSAGE);
+    }
+
+    private EpisodeDetailResponse bulkheadFullEpisode(Long episodeId, BulkheadFullException ex) {
+        throw new TvMazeOverloadedException(OVERLOADED_MESSAGE);
+    }
 
     record SearchResultItem(ShowResponse show) {
     }
